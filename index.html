@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GRADUS — Sistema Docente</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        @media print {
+            .no-print { display: none !important; }
+            .print-area { border: none !important; padding: 0 !important; }
+            body { background: white; }
+        }
+    </style>
+</head>
+<body class="bg-slate-50 min-h-screen text-slate-900">
+
+    <!-- ═══════════════════════════════════════
+         VISTA 1: MIS GRADOS
+    ═══════════════════════════════════════ -->
+    <section id="vista-grados" class="p-6 max-w-5xl mx-auto">
+        <header class="flex justify-between items-center mb-8">
+            <div>
+                <h1 class="text-3xl font-black text-blue-900 italic">GRADUS</h1>
+                <p class="text-slate-400 text-xs uppercase font-bold tracking-widest">Sistema Docente · IDSJE</p>
+            </div>
+            <button onclick="crearGrado()"
+                class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all text-sm">
+                <i class="fas fa-plus mr-2"></i>Nuevo Grado
+            </button>
+        </header>
+        <div id="lista-grados-cards" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <!-- Cards de grados se renderizan aquí -->
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         VISTA 2: DETALLE DEL GRADO
+    ═══════════════════════════════════════ -->
+    <section id="vista-detalle-grado" class="hidden min-h-screen flex flex-col no-print">
+
+        <!-- Header sticky -->
+        <header class="bg-blue-900 text-white p-4 shadow-lg flex justify-between items-center sticky top-0 z-50">
+            <div class="flex items-center gap-4">
+                <button onclick="mostrarGrados()" class="hover:text-blue-200 transition-colors">
+                    <i class="fas fa-arrow-left fa-lg"></i>
+                </button>
+                <h2 id="titulo-grado-actual" class="text-xl font-black uppercase italic tracking-wider"></h2>
+            </div>
+            <div class="flex items-center gap-3">
+                <!-- Selector de periodos -->
+                <div id="selector-periodos" class="flex bg-blue-800 rounded-lg p-1 border border-blue-700">
+                    <button onclick="setPeriodo(1)" class="px-4 py-1 rounded-md font-bold text-xs">P1</button>
+                    <button onclick="setPeriodo(2)" class="px-4 py-1 rounded-md font-bold text-xs">P2</button>
+                    <button onclick="setPeriodo(3)" class="px-4 py-1 rounded-md font-bold text-xs">P3</button>
+                    <button onclick="setPeriodo(4)" class="px-4 py-1 rounded-md font-bold text-xs">P4</button>
+                </div>
+                <button onclick="generarReporte()"
+                    class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg uppercase transition-all">
+                    <i class="fas fa-file-alt mr-1"></i>Reporte
+                </button>
+            </div>
+        </header>
+
+        <!-- Contenido principal -->
+        <main class="p-4 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-4 gap-6">
+
+            <!-- Sidebar: formularios -->
+            <aside class="lg:col-span-1 space-y-4">
+
+                <!-- Nueva Actividad -->
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-200">
+                    <h3 class="text-blue-600 font-black text-[10px] uppercase mb-4 italic tracking-widest text-center">
+                        Nueva Actividad
+                    </h3>
+                    <input type="text" id="input-tarea-nom" placeholder="Nombre de tarea"
+                        class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm mb-2 outline-none focus:ring-2 focus:ring-blue-400">
+                    <input type="date" id="input-tarea-fecha"
+                        class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm mb-2 outline-none focus:ring-2 focus:ring-blue-400">
+                    <select id="input-tarea-tipo"
+                        class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm mb-4 font-bold text-slate-600 outline-none">
+                        <option value="c">Cotidiana (35%)</option>
+                        <option value="i">Integradora (35%)</option>
+                        <option value="e">Examen (30%)</option>
+                    </select>
+                    <button onclick="crearTarea()"
+                        class="w-full bg-blue-600 text-white py-3 rounded-xl font-black text-xs uppercase shadow-md hover:bg-blue-700 transition-all">
+                        <i class="fas fa-plus mr-1"></i>Asignar Tarea
+                    </button>
+                </div>
+
+                <!-- Agregar Estudiantes -->
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-200">
+                    <h3 class="text-blue-600 font-black text-[10px] uppercase mb-4 italic tracking-widest text-center">
+                        Estudiantes
+                    </h3>
+                    <div class="flex flex-col gap-2 mb-4">
+                        <input type="text" id="input-alumno" placeholder="APELLIDOS, NOMBRES"
+                            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                            onkeydown="if(event.key==='Enter') agregarAlumno()">
+                        <button onclick="agregarAlumno()"
+                            class="bg-emerald-500 text-white py-2 rounded-xl font-bold text-[10px] uppercase hover:bg-emerald-600 transition-all">
+                            <i class="fas fa-user-plus mr-1"></i>Agregar Manual
+                        </button>
+                    </div>
+                    <div class="border-t border-slate-100 pt-4 text-center">
+                        <input type="file" id="excel-input" accept=".xlsx,.xls" class="hidden" onchange="importarExcel(event)">
+                        <button onclick="document.getElementById('excel-input').click()"
+                            class="w-full bg-slate-800 text-white py-2 rounded-xl font-bold text-[10px] hover:bg-slate-900 transition-all italic">
+                            <i class="fas fa-file-excel mr-2 text-emerald-400"></i>SUBIR LISTA EXCEL
+                        </button>
+                        <p class="text-[9px] text-slate-400 mt-2">La columna A debe tener: APELLIDOS, NOMBRES</p>
+                    </div>
+                </div>
+
+            </aside>
+
+            <!-- Tabla principal -->
+            <div class="lg:col-span-3">
+                <div class="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200">
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-left min-w-[600px]">
+                            <thead class="bg-slate-800 text-white text-[9px] uppercase tracking-widest">
+                                <tr>
+                                    <th class="p-5 text-center w-10">Nº</th>
+                                    <th class="p-5">Apellidos</th>
+                                    <th class="p-5">Nombres</th>
+                                    <th class="p-5 text-center">Prom C.</th>
+                                    <th class="p-5 text-center">Prom I.</th>
+                                    <th class="p-5 text-center">Examen</th>
+                                    <th class="p-5 text-center bg-blue-700 font-black italic">Final</th>
+                                    <th class="p-5 text-center">Detalle</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-cuerpo" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         VISTA 3: REPORTE
+    ═══════════════════════════════════════ -->
+    <section id="vista-reporte" class="hidden min-h-screen bg-slate-100 p-4 md:p-8">
+        <div class="max-w-5xl mx-auto">
+            <div id="reporte-contenido" class="bg-white border-2 border-slate-800 p-8 shadow-2xl print-area rounded-2xl">
+                <!-- Generado dinámicamente -->
+            </div>
+            <footer class="mt-8 flex justify-center gap-4 no-print">
+                <button onclick="window.print()"
+                    class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all">
+                    <i class="fas fa-print mr-2"></i>IMPRIMIR / PDF
+                </button>
+                <button onclick="cerrarReporte()"
+                    class="bg-slate-800 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-slate-900 transition-all">
+                    <i class="fas fa-arrow-left mr-2"></i>VOLVER
+                </button>
+            </footer>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         VISTA 4: ANECDÓTICO
+    ═══════════════════════════════════════ -->
+    <section id="vista-anecdotico" class="hidden min-h-screen flex flex-col">
+        <header class="bg-violet-900 text-white p-4 shadow-lg flex justify-between items-center sticky top-0 z-50">
+            <div class="flex items-center gap-4">
+                <button onclick="mostrarGrados()" class="hover:text-violet-200 transition-colors">
+                    <i class="fas fa-arrow-left fa-lg"></i>
+                </button>
+                <div>
+                    <h2 id="titulo-anecdotico" class="text-xl font-black uppercase italic tracking-wider"></h2>
+                    <p class="text-violet-300 text-[10px] font-bold uppercase tracking-widest">Registro Anecdótico</p>
+                </div>
+            </div>
+            <div class="flex items-center gap-3">
+                <div id="selector-periodos-anec" class="flex bg-violet-800 rounded-lg p-1 border border-violet-700">
+                    <button onclick="setPeriodoAnec(1)" class="px-4 py-1 rounded-md font-bold text-xs">P1</button>
+                    <button onclick="setPeriodoAnec(2)" class="px-4 py-1 rounded-md font-bold text-xs">P2</button>
+                    <button onclick="setPeriodoAnec(3)" class="px-4 py-1 rounded-md font-bold text-xs">P3</button>
+                    <button onclick="setPeriodoAnec(4)" class="px-4 py-1 rounded-md font-bold text-xs">P4</button>
+                </div>
+                <button onclick="imprimirAnecdotico()"
+                    class="bg-violet-500 hover:bg-violet-600 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg uppercase transition-all">
+                    <i class="fas fa-print mr-1"></i>Imprimir
+                </button>
+            </div>
+        </header>
+
+        <main class="p-4 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-4 gap-6">
+            <aside class="lg:col-span-1">
+                <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-200 sticky top-24">
+                    <h3 class="text-violet-600 font-black text-[10px] uppercase mb-4 italic tracking-widest text-center">
+                        Nuevo Registro
+                    </h3>
+                    <select id="anec-alumno"
+                        class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm mb-2 outline-none focus:ring-2 focus:ring-violet-400 font-bold text-slate-700">
+                        <option value="">— Seleccionar alumno —</option>
+                    </select>
+                    <select id="anec-tipo"
+                        class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm mb-2 outline-none focus:ring-2 focus:ring-violet-400 font-bold">
+                        <option value="positivo">👍 Positivo</option>
+                        <option value="negativo">👎 Negativo</option>
+                        <option value="atencion">⚠️ Llamada de atención</option>
+                        <option value="compromiso">🤝 Compromiso / Acuerdo</option>
+                        <option value="neutral">📋 Observación neutral</option>
+                    </select>
+                    <input type="date" id="anec-fecha"
+                        class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm mb-2 outline-none focus:ring-2 focus:ring-violet-400">
+                    <textarea id="anec-descripcion" rows="4" placeholder="Describí lo que ocurrió..."
+                        class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm mb-4 outline-none focus:ring-2 focus:ring-violet-400 resize-none"></textarea>
+                    <button onclick="guardarRegistroAnec()"
+                        class="w-full bg-violet-600 text-white py-3 rounded-xl font-black text-xs uppercase shadow-md hover:bg-violet-700 transition-all">
+                        <i class="fas fa-plus mr-1"></i>Guardar Registro
+                    </button>
+                </div>
+            </aside>
+            <div class="lg:col-span-3 space-y-3" id="lista-anecdotico"></div>
+        </main>
+    </section>
+
+    <!-- Scripts externos -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+    <!-- App principal como módulo ES6 -->
+    <script type="module" src="./src/js/main.js"></script>
+</body>
+</html>
