@@ -48,16 +48,20 @@ function obtenerCalculos(al, tareasDelPeriodo) {
 //  VISTAS
 // ─────────────────────────────────────────────
 function mostrarVista(id) {
-    ['vista-grados', 'vista-detalle-grado', 'vista-reporte', 'vista-anecdotico'].forEach(v => {
+    ['vista-auth', 'vista-grados', 'vista-detalle-grado', 'vista-reporte', 'vista-anecdotico'].forEach(v => {
         document.getElementById(v).classList.toggle('hidden', v !== id);
     });
 }
 
 window.mostrarGrados = async () => {
-    const { data, error } = await supabase.from('grados').select('*').order('nombre');
+    const { data: { user } } = await supabase.auth.getUser();
+    const { data, error } = await supabase.from('grados').select('*').eq('user_id', user.id).order('nombre');
     if (error) { console.error('Error cargando grados:', error); return; }
     gradosCache = data || [];
     mostrarVista('vista-grados');
+    // Mostrar nombre del usuario
+    const nombre = user.user_metadata?.nombre || user.email;
+    document.getElementById('usuario-nombre').textContent = nombre;
     renderGrados();
 };
 
@@ -65,9 +69,10 @@ window.crearGrado = async () => {
     const nombre = prompt('Nombre del grado (ej: 1° Bachillerato A):');
     if (!nombre || !nombre.trim()) return;
     const materia = prompt('Materia (opcional, ej: Informatica):') || '';
+    const { data: { user } } = await supabase.auth.getUser();
     const { data, error } = await supabase
         .from('grados')
-        .insert([{ nombre: nombre.trim().toUpperCase(), materia: materia.trim() }])
+        .insert([{ nombre: nombre.trim().toUpperCase(), materia: materia.trim(), user_id: user.id }])
         .select();
     if (error) { alert('Error al crear grado: ' + error.message); return; }
     gradosCache.push(data[0]);
@@ -531,9 +536,75 @@ window.cerrarReporte = () => {
 };
 
 // ─────────────────────────────────────────────
-//  INICIO
+//  CÓDIGO DE ACCESO (cambiá esto cuando quieras)
 // ─────────────────────────────────────────────
-mostrarGrados();
+const CODIGO_ACCESO = 'IDSJE2026';
+
+// ─────────────────────────────────────────────
+//  AUTH
+// ─────────────────────────────────────────────
+window.switchTab = (tab) => {
+    document.getElementById('form-login').classList.toggle('hidden', tab !== 'login');
+    document.getElementById('form-registro').classList.toggle('hidden', tab !== 'registro');
+    document.getElementById('tab-login').className   = tab === 'login'
+        ? 'flex-1 py-4 font-black text-xs uppercase tracking-widest text-blue-600 border-b-2 border-blue-600 transition-all'
+        : 'flex-1 py-4 font-black text-xs uppercase tracking-widest text-slate-400 border-b-2 border-transparent transition-all';
+    document.getElementById('tab-registro').className = tab === 'registro'
+        ? 'flex-1 py-4 font-black text-xs uppercase tracking-widest text-blue-600 border-b-2 border-blue-600 transition-all'
+        : 'flex-1 py-4 font-black text-xs uppercase tracking-widest text-slate-400 border-b-2 border-transparent transition-all';
+};
+
+window.hacerLogin = async () => {
+    const email    = document.getElementById('login-email').value.trim();
+    const password = document.getElementById('login-password').value;
+    const errEl    = document.getElementById('login-error');
+    errEl.classList.add('hidden');
+
+    if (!email || !password) { errEl.textContent = 'Completá todos los campos'; errEl.classList.remove('hidden'); return; }
+
+    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    if (error) { errEl.textContent = 'Correo o contraseña incorrectos'; errEl.classList.remove('hidden'); return; }
+    mostrarGrados();
+};
+
+window.hacerRegistro = async () => {
+    const nombre   = document.getElementById('reg-nombre').value.trim();
+    const email    = document.getElementById('reg-email').value.trim();
+    const password = document.getElementById('reg-password').value;
+    const codigo   = document.getElementById('reg-codigo').value.trim();
+    const errEl    = document.getElementById('reg-error');
+    const okEl     = document.getElementById('reg-ok');
+    errEl.classList.add('hidden');
+    okEl.classList.add('hidden');
+
+    if (!nombre || !email || !password || !codigo) { errEl.textContent = 'Completá todos los campos'; errEl.classList.remove('hidden'); return; }
+    if (codigo !== CODIGO_ACCESO) { errEl.textContent = 'Código de acceso incorrecto'; errEl.classList.remove('hidden'); return; }
+    if (password.length < 6) { errEl.textContent = 'La contraseña debe tener al menos 6 caracteres'; errEl.classList.remove('hidden'); return; }
+
+    const { error } = await supabase.auth.signUp({ email, password, options: { data: { nombre } } });
+    if (error) { errEl.textContent = error.message; errEl.classList.remove('hidden'); return; }
+
+    okEl.textContent = '✅ Cuenta creada. Ya podés iniciar sesión.';
+    okEl.classList.remove('hidden');
+    switchTab('login');
+};
+
+window.cerrarSesion = async () => {
+    await supabase.auth.signOut();
+    mostrarVista('vista-auth');
+};
+
+// ─────────────────────────────────────────────
+//  INICIO — verificar sesión activa
+// ─────────────────────────────────────────────
+(async () => {
+    const { data: { session } } = await supabase.auth.getSession();
+    if (session) {
+        mostrarGrados();
+    } else {
+        mostrarVista('vista-auth');
+    }
+})();
 
 // ─────────────────────────────────────────────
 //  EDICIÓN DE TAREAS Y ALUMNOS
