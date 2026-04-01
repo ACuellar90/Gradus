@@ -12,35 +12,84 @@
             .print-area { border: none !important; padding: 0 !important; }
             body { background: white; }
         }
+        .auth-bg {
+            background: linear-gradient(135deg, #1e3a5f 0%, #1a2e4a 50%, #0f1f35 100%);
+        }
     </style>
 </head>
 <body class="bg-slate-50 min-h-screen text-slate-900">
 
     <!-- ═══════════════════════════════════════
+         VISTA 0: AUTH (Login / Registro)
+    ═══════════════════════════════════════ -->
+    <section id="vista-auth" class="hidden min-h-screen auth-bg flex items-center justify-center p-4">
+        <div class="w-full max-w-md">
+            <!-- Logo -->
+            <div class="text-center mb-8">
+                <h1 class="text-4xl font-black text-white italic tracking-tight">GRADUS</h1>
+                <p class="text-blue-300 text-xs uppercase font-bold tracking-widest mt-1">Sistema Docente · IDSJE</p>
+            </div>
+
+            <!-- Card -->
+            <div class="bg-white rounded-3xl shadow-2xl overflow-hidden">
+                <div class="px-8 pt-6 pb-0 border-b border-slate-100">
+                    <p class="font-black text-xs uppercase tracking-widest text-slate-400 pb-4">Iniciar Sesión</p>
+                </div>
+
+                <!-- Login Form -->
+                <div id="form-login" class="p-8">
+                    <div class="mb-4">
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Correo</label>
+                        <input type="email" id="login-email" placeholder="tu@correo.com"
+                            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400">
+                    </div>
+                    <div class="mb-6">
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Contraseña</label>
+                        <input type="password" id="login-password" placeholder="••••••••"
+                            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                            onkeydown="if(event.key==='Enter') hacerLogin()">
+                    </div>
+                    <button onclick="hacerLogin()"
+                        class="w-full bg-blue-600 text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-blue-700 transition-all">
+                        <i class="fas fa-sign-in-alt mr-2"></i>Entrar
+                    </button>
+                    <p id="login-error" class="text-red-500 text-xs text-center mt-3 hidden"></p>
+                </div>
+
+
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
          VISTA 1: MIS GRADOS
     ═══════════════════════════════════════ -->
-    <section id="vista-grados" class="p-6 max-w-5xl mx-auto">
+    <section id="vista-grados" class="hidden p-6 max-w-5xl mx-auto">
         <header class="flex justify-between items-center mb-8">
             <div>
                 <h1 class="text-3xl font-black text-blue-900 italic">GRADUS</h1>
                 <p class="text-slate-400 text-xs uppercase font-bold tracking-widest">Sistema Docente · IDSJE</p>
             </div>
-            <button onclick="crearGrado()"
-                class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all text-sm">
-                <i class="fas fa-plus mr-2"></i>Nuevo Grado
-            </button>
+            <div class="flex items-center gap-3">
+                <span id="usuario-nombre" class="text-xs font-bold text-slate-500 uppercase"></span>
+                <button onclick="crearGrado()"
+                    class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all text-sm">
+                    <i class="fas fa-plus mr-2"></i>Nuevo Grado
+                </button>
+                <button onclick="cerrarSesion()"
+                    class="bg-slate-100 text-slate-500 px-4 py-2 rounded-xl font-bold hover:bg-slate-200 transition-all text-xs"
+                    title="Cerrar sesión">
+                    <i class="fas fa-sign-out-alt"></i>
+                </button>
+            </div>
         </header>
-        <div id="lista-grados-cards" class="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <!-- Cards de grados se renderizan aquí -->
-        </div>
+        <div id="lista-grados-cards" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
     </section>
 
     <!-- ═══════════════════════════════════════
          VISTA 2: DETALLE DEL GRADO
     ═══════════════════════════════════════ -->
     <section id="vista-detalle-grado" class="hidden min-h-screen flex flex-col no-print">
-
-        <!-- Header sticky -->
         <header class="bg-blue-900 text-white p-4 shadow-lg flex justify-between items-center sticky top-0 z-50">
             <div class="flex items-center gap-4">
                 <button onclick="mostrarGrados()" class="hover:text-blue-200 transition-colors">
@@ -49,7 +98,6 @@
                 <h2 id="titulo-grado-actual" class="text-xl font-black uppercase italic tracking-wider"></h2>
             </div>
             <div class="flex items-center gap-3">
-                <!-- Selector de periodos -->
                 <div id="selector-periodos" class="flex bg-blue-800 rounded-lg p-1 border border-blue-700">
                     <button onclick="setPeriodo(1)" class="px-4 py-1 rounded-md font-bold text-xs">P1</button>
                     <button onclick="setPeriodo(2)" class="px-4 py-1 rounded-md font-bold text-xs">P2</button>
@@ -62,18 +110,10 @@
                 </button>
             </div>
         </header>
-
-        <!-- Contenido principal -->
         <main class="p-4 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-4 gap-6">
-
-            <!-- Sidebar: formularios -->
             <aside class="lg:col-span-1 space-y-4">
-
-                <!-- Nueva Actividad -->
                 <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-200">
-                    <h3 class="text-blue-600 font-black text-[10px] uppercase mb-4 italic tracking-widest text-center">
-                        Nueva Actividad
-                    </h3>
+                    <h3 class="text-blue-600 font-black text-[10px] uppercase mb-4 italic tracking-widest text-center">Nueva Actividad</h3>
                     <input type="text" id="input-tarea-nom" placeholder="Nombre de tarea"
                         class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm mb-2 outline-none focus:ring-2 focus:ring-blue-400">
                     <input type="date" id="input-tarea-fecha"
@@ -89,12 +129,8 @@
                         <i class="fas fa-plus mr-1"></i>Asignar Tarea
                     </button>
                 </div>
-
-                <!-- Agregar Estudiantes -->
                 <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-200">
-                    <h3 class="text-blue-600 font-black text-[10px] uppercase mb-4 italic tracking-widest text-center">
-                        Estudiantes
-                    </h3>
+                    <h3 class="text-blue-600 font-black text-[10px] uppercase mb-4 italic tracking-widest text-center">Estudiantes</h3>
                     <div class="flex flex-col gap-2 mb-4">
                         <input type="text" id="input-alumno" placeholder="APELLIDOS, NOMBRES"
                             class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400"
@@ -113,10 +149,7 @@
                         <p class="text-[9px] text-slate-400 mt-2">La columna A debe tener: APELLIDOS, NOMBRES</p>
                     </div>
                 </div>
-
             </aside>
-
-            <!-- Tabla principal -->
             <div class="lg:col-span-3">
                 <div class="bg-white rounded-3xl shadow-xl overflow-hidden border border-slate-200">
                     <div class="overflow-x-auto">
@@ -146,9 +179,7 @@
     ═══════════════════════════════════════ -->
     <section id="vista-reporte" class="hidden min-h-screen bg-slate-100 p-4 md:p-8">
         <div class="max-w-5xl mx-auto">
-            <div id="reporte-contenido" class="bg-white border-2 border-slate-800 p-8 shadow-2xl print-area rounded-2xl">
-                <!-- Generado dinámicamente -->
-            </div>
+            <div id="reporte-contenido" class="bg-white border-2 border-slate-800 p-8 shadow-2xl print-area rounded-2xl"></div>
             <footer class="mt-8 flex justify-center gap-4 no-print">
                 <button onclick="window.print()"
                     class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all">
@@ -189,27 +220,21 @@
                 </button>
             </div>
         </header>
-
         <main class="p-4 max-w-7xl mx-auto w-full grid grid-cols-1 lg:grid-cols-4 gap-6">
             <aside class="lg:col-span-1">
                 <div class="bg-white p-5 rounded-3xl shadow-sm border border-slate-200 sticky top-24">
-                    <h3 class="text-violet-600 font-black text-[10px] uppercase mb-4 italic tracking-widest text-center">
-                        Nuevo Registro
-                    </h3>
-                    <select id="anec-alumno"
-                        class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm mb-2 outline-none focus:ring-2 focus:ring-violet-400 font-bold text-slate-700">
+                    <h3 class="text-violet-600 font-black text-[10px] uppercase mb-4 italic tracking-widest text-center">Nuevo Registro</h3>
+                    <select id="anec-alumno" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm mb-2 outline-none focus:ring-2 focus:ring-violet-400 font-bold text-slate-700">
                         <option value="">— Seleccionar alumno —</option>
                     </select>
-                    <select id="anec-tipo"
-                        class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm mb-2 outline-none focus:ring-2 focus:ring-violet-400 font-bold">
+                    <select id="anec-tipo" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm mb-2 outline-none focus:ring-2 focus:ring-violet-400 font-bold">
                         <option value="positivo">👍 Positivo</option>
                         <option value="negativo">👎 Negativo</option>
                         <option value="atencion">⚠️ Llamada de atención</option>
                         <option value="compromiso">🤝 Compromiso / Acuerdo</option>
                         <option value="neutral">📋 Observación neutral</option>
                     </select>
-                    <input type="date" id="anec-fecha"
-                        class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm mb-2 outline-none focus:ring-2 focus:ring-violet-400">
+                    <input type="date" id="anec-fecha" class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm mb-2 outline-none focus:ring-2 focus:ring-violet-400">
                     <textarea id="anec-descripcion" rows="4" placeholder="Describí lo que ocurrió..."
                         class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm mb-4 outline-none focus:ring-2 focus:ring-violet-400 resize-none"></textarea>
                     <button onclick="guardarRegistroAnec()"
@@ -222,11 +247,8 @@
         </main>
     </section>
 
-    <!-- Scripts externos -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
-    <!-- App principal como módulo ES6 -->
     <script type="module" src="./src/js/main.js"></script>
 </body>
 </html>
