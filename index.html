@@ -20,23 +20,18 @@
 <body class="bg-slate-50 min-h-screen text-slate-900">
 
     <!-- ═══════════════════════════════════════
-         VISTA 0: AUTH (Login / Registro)
+         VISTA 0: AUTH
     ═══════════════════════════════════════ -->
     <section id="vista-auth" class="hidden min-h-screen auth-bg flex items-center justify-center p-4">
         <div class="w-full max-w-md">
-            <!-- Logo -->
             <div class="text-center mb-8">
                 <h1 class="text-4xl font-black text-white italic tracking-tight">GRADUS</h1>
                 <p class="text-blue-300 text-xs uppercase font-bold tracking-widest mt-1">Sistema Docente · IDSJE</p>
             </div>
-
-            <!-- Card -->
             <div class="bg-white rounded-3xl shadow-2xl overflow-hidden">
                 <div class="px-8 pt-6 pb-0 border-b border-slate-100">
                     <p class="font-black text-xs uppercase tracking-widest text-slate-400 pb-4">Iniciar Sesión</p>
                 </div>
-
-                <!-- Login Form -->
                 <div id="form-login" class="p-8">
                     <div class="mb-4">
                         <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Correo</label>
@@ -55,8 +50,6 @@
                     </button>
                     <p id="login-error" class="text-red-500 text-xs text-center mt-3 hidden"></p>
                 </div>
-
-
             </div>
         </div>
     </section>
@@ -85,6 +78,111 @@
         </header>
         <div id="lista-grados-cards" class="grid grid-cols-1 md:grid-cols-3 gap-6"></div>
     </section>
+
+    <!-- ═══════════════════════════════════════
+         VISTA 1.5: SELECTOR DE PERÍODO (NUEVO)
+    ═══════════════════════════════════════ -->
+    <section id="vista-selector-periodo" class="hidden min-h-screen auth-bg flex items-center justify-center p-4">
+        <div class="w-full max-w-md">
+            <!-- Header con volver -->
+            <div class="flex items-center gap-3 mb-8">
+                <button onclick="mostrarGrados()" class="text-white hover:text-blue-200 transition-colors">
+                    <i class="fas fa-arrow-left fa-lg"></i>
+                </button>
+                <div>
+                    <h1 class="text-2xl font-black text-white italic" id="sp-titulo-grado"></h1>
+                    <p class="text-blue-300 text-[10px] uppercase font-bold tracking-widest" id="sp-materia-grado"></p>
+                </div>
+            </div>
+
+            <!-- Card selector -->
+            <div class="bg-white rounded-3xl shadow-2xl p-8">
+                <p class="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-6 text-center">
+                    <i class="fas fa-calendar-alt mr-2 text-blue-400"></i>Seleccioná el período
+                </p>
+                <div class="grid grid-cols-2 gap-4">
+                    <button class="btn-periodo-selector w-full py-6 rounded-2xl font-black text-lg uppercase tracking-wider transition-all shadow-sm border-2 bg-white text-blue-900 border-blue-200 hover:border-blue-400 hover:shadow-md">
+                        <div class="text-3xl mb-1">1</div>
+                        <div class="text-[10px] font-bold text-slate-400">Primer Período</div>
+                    </button>
+                    <button class="btn-periodo-selector w-full py-6 rounded-2xl font-black text-lg uppercase tracking-wider transition-all shadow-sm border-2 bg-white text-blue-900 border-blue-200 hover:border-blue-400 hover:shadow-md">
+                        <div class="text-3xl mb-1">2</div>
+                        <div class="text-[10px] font-bold text-slate-400">Segundo Período</div>
+                    </button>
+                    <button class="btn-periodo-selector w-full py-6 rounded-2xl font-black text-lg uppercase tracking-wider transition-all shadow-sm border-2 bg-white text-blue-900 border-blue-200 hover:border-blue-400 hover:shadow-md">
+                        <div class="text-3xl mb-1">3</div>
+                        <div class="text-[10px] font-bold text-slate-400">Tercer Período</div>
+                    </button>
+                    <button class="btn-periodo-selector w-full py-6 rounded-2xl font-black text-lg uppercase tracking-wider transition-all shadow-sm border-2 bg-white text-blue-900 border-blue-200 hover:border-blue-400 hover:shadow-md">
+                        <div class="text-3xl mb-1">4</div>
+                        <div class="text-[10px] font-bold text-slate-400">Cuarto Período</div>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         MODAL: RECUPERACIÓN POR ALUMNO (NUEVO)
+    ═══════════════════════════════════════ -->
+    <div id="modal-recup" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+        <div class="bg-white rounded-3xl shadow-2xl w-full max-w-sm overflow-hidden">
+            <!-- Header -->
+            <div class="bg-amber-500 px-6 py-4 flex justify-between items-center">
+                <div>
+                    <p class="text-[10px] font-black uppercase tracking-widest text-amber-100">Recuperación</p>
+                    <h3 id="modal-recup-titulo" class="text-white font-black text-base"></h3>
+                </div>
+                <button onclick="cerrarModalRecuperacion()" class="text-amber-100 hover:text-white transition-colors">
+                    <i class="fas fa-times fa-lg"></i>
+                </button>
+            </div>
+            <!-- Body -->
+            <div class="p-6">
+                <input type="hidden" id="modal-recup-alid">
+                <p class="text-[10px] text-slate-400 font-bold uppercase mb-5 text-center">
+                    Ingresá la nota de recuperación (máx. 7 por componente)
+                </p>
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-emerald-600 mb-1">
+                            <i class="fas fa-circle mr-1"></i>Cotidiana (35%)
+                        </label>
+                        <input type="number" id="recup-c" step="0.1" min="0" max="7" placeholder="0.0 — máx. 7"
+                            class="w-full p-3 bg-emerald-50 border border-emerald-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-emerald-400 text-center text-lg">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-orange-600 mb-1">
+                            <i class="fas fa-circle mr-1"></i>Integradora (35%)
+                        </label>
+                        <input type="number" id="recup-i" step="0.1" min="0" max="7" placeholder="0.0 — máx. 7"
+                            class="w-full p-3 bg-orange-50 border border-orange-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-orange-400 text-center text-lg">
+                    </div>
+                    <div>
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-purple-600 mb-1">
+                            <i class="fas fa-circle mr-1"></i>Examen (30%)
+                        </label>
+                        <input type="number" id="recup-e" step="0.1" min="0" max="7" placeholder="0.0 — máx. 7"
+                            class="w-full p-3 bg-purple-50 border border-purple-200 rounded-xl text-sm font-bold outline-none focus:ring-2 focus:ring-purple-400 text-center text-lg">
+                    </div>
+                </div>
+                <p class="text-[9px] text-slate-400 text-center mt-4 italic">
+                    Dejá los campos vacíos para eliminar la recuperación de este período.
+                </p>
+            </div>
+            <!-- Footer -->
+            <div class="px-6 pb-6 flex gap-3">
+                <button onclick="cerrarModalRecuperacion()"
+                    class="flex-1 py-3 rounded-xl font-black text-xs uppercase border border-slate-200 text-slate-500 hover:bg-slate-50 transition-all">
+                    Cancelar
+                </button>
+                <button onclick="guardarRecuperacion()"
+                    class="flex-1 py-3 rounded-xl font-black text-xs uppercase bg-amber-500 text-white shadow-lg hover:bg-amber-600 transition-all">
+                    <i class="fas fa-save mr-1"></i>Guardar
+                </button>
+            </div>
+        </div>
+    </div>
 
     <!-- ═══════════════════════════════════════
          VISTA 2: DETALLE DEL GRADO
