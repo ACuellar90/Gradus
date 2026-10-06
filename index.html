@@ -20,35 +20,61 @@
 <body class="bg-slate-50 min-h-screen text-slate-900">
 
     <!-- ═══════════════════════════════════════
-         VISTA 0: AUTH
+         VISTA 0: AJUSTES (primera vez y desde el engranaje)
     ═══════════════════════════════════════ -->
-    <section id="vista-auth" class="hidden min-h-screen auth-bg flex items-center justify-center p-4">
+    <section id="vista-ajustes" class="hidden min-h-screen auth-bg flex items-center justify-center p-4">
         <div class="w-full max-w-md">
             <div class="text-center mb-8">
                 <h1 class="text-4xl font-black text-white italic tracking-tight">GRADUS</h1>
-                <p class="text-blue-300 text-xs uppercase font-bold tracking-widest mt-1">Sistema Docente · IDSJE</p>
+                <p class="text-blue-300 text-xs uppercase font-bold tracking-widest mt-1">Tus notas, listas solas</p>
             </div>
             <div class="bg-white rounded-3xl shadow-2xl overflow-hidden">
-                <div class="px-8 pt-6 pb-0 border-b border-slate-100">
-                    <p class="font-black text-xs uppercase tracking-widest text-slate-400 pb-4">Iniciar Sesión</p>
+                <div class="px-8 pt-6 pb-0 border-b border-slate-100 flex justify-between items-center">
+                    <p id="ajustes-titulo" class="font-black text-xs uppercase tracking-widest text-slate-400 pb-4">Ajustes</p>
+                    <button id="ajustes-volver" onclick="mostrarGrados()" class="hidden text-slate-400 hover:text-blue-600 pb-4 text-xs font-bold uppercase">
+                        <i class="fas fa-times mr-1"></i>Cerrar
+                    </button>
                 </div>
-                <div id="form-login" class="p-8">
+                <div class="p-8">
                     <div class="mb-4">
-                        <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Correo</label>
-                        <input type="email" id="login-email" placeholder="tu@correo.com"
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Tu nombre</label>
+                        <input type="text" id="ajustes-docente" placeholder="Prof. Nombre Apellido"
+                            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400">
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Institución</label>
+                        <input type="text" id="ajustes-institucion" placeholder="Nombre del centro escolar"
                             class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400">
                     </div>
                     <div class="mb-6">
-                        <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Contraseña</label>
-                        <input type="password" id="login-password" placeholder="••••••••"
-                            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400"
-                            onkeydown="if(event.key==='Enter') hacerLogin()">
+                        <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Año lectivo</label>
+                        <input type="number" id="ajustes-anio" min="2020" max="2100"
+                            class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400">
                     </div>
-                    <button onclick="hacerLogin()"
+                    <button onclick="guardarAjustesForm()"
                         class="w-full bg-blue-600 text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-blue-700 transition-all">
-                        <i class="fas fa-sign-in-alt mr-2"></i>Entrar
+                        <i class="fas fa-check mr-2"></i>Guardar
                     </button>
-                    <p id="login-error" class="text-red-500 text-xs text-center mt-3 hidden"></p>
+                    <p id="ajustes-error" class="text-red-500 text-xs text-center mt-3 hidden"></p>
+                    <p class="text-[10px] text-slate-400 text-center mt-3">Estos datos aparecen en tus reportes impresos.</p>
+                </div>
+                <div class="px-8 py-6 bg-slate-50 border-t border-slate-100">
+                    <p class="font-black text-[10px] uppercase tracking-widest text-slate-400 mb-1">Respaldo</p>
+                    <p class="text-[10px] text-slate-500 mb-4">Tus notas se guardan solo en este dispositivo. Descargá un respaldo seguido y guardalo en Drive o en tu correo.</p>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="exportarRespaldo()"
+                            class="bg-emerald-500 text-white py-2 rounded-xl font-bold text-[10px] uppercase hover:bg-emerald-600 transition-all">
+                            <i class="fas fa-download mr-1"></i>Descargar
+                        </button>
+                        <input type="file" id="respaldo-input" accept=".json,application/json" class="hidden" onchange="importarRespaldo(event)">
+                        <button onclick="document.getElementById('respaldo-input').click()"
+                            class="bg-slate-800 text-white py-2 rounded-xl font-bold text-[10px] uppercase hover:bg-slate-900 transition-all">
+                            <i class="fas fa-upload mr-1"></i>Cargar
+                        </button>
+                    </div>
+                    <a href="migrar.html" class="block text-center text-[10px] text-blue-500 hover:text-blue-700 font-bold mt-4">
+                        <i class="fas fa-cloud-download-alt mr-1"></i>¿Usabas la versión en la nube? Traé tus datos aquí
+                    </a>
                 </div>
             </div>
         </div>
@@ -61,7 +87,7 @@
         <header class="flex justify-between items-center mb-8">
             <div>
                 <h1 class="text-3xl font-black text-blue-900 italic">GRADUS</h1>
-                <p class="text-slate-400 text-xs uppercase font-bold tracking-widest">Sistema Docente · IDSJE</p>
+                <p id="subtitulo-institucion" class="text-slate-400 text-xs uppercase font-bold tracking-widest">Sistema Docente</p>
             </div>
             <div class="flex items-center gap-3">
                 <span id="usuario-nombre" class="text-xs font-bold text-slate-500 uppercase"></span>
@@ -69,10 +95,10 @@
                     class="bg-blue-600 text-white px-6 py-2 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all text-sm">
                     <i class="fas fa-plus mr-2"></i>Nuevo Grado
                 </button>
-                <button onclick="cerrarSesion()"
+                <button onclick="abrirAjustes()"
                     class="bg-slate-100 text-slate-500 px-4 py-2 rounded-xl font-bold hover:bg-slate-200 transition-all text-xs"
-                    title="Cerrar sesión">
-                    <i class="fas fa-sign-out-alt"></i>
+                    title="Ajustes y respaldo">
+                    <i class="fas fa-cog"></i>
                 </button>
             </div>
         </header>
@@ -346,7 +372,6 @@
     </section>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script type="module" src="./src/js/main.js"></script>
 </body>
 </html>

@@ -1,0 +1,147 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GRADUS — Traer datos de la nube</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .auth-bg { background: linear-gradient(135deg, #1e3a5f 0%, #1a2e4a 50%, #0f1f35 100%); }
+    </style>
+</head>
+<body class="auth-bg min-h-screen flex items-center justify-center p-4 text-slate-900">
+    <div class="w-full max-w-md">
+        <div class="text-center mb-8">
+            <h1 class="text-4xl font-black text-white italic tracking-tight">GRADUS</h1>
+            <p class="text-blue-300 text-xs uppercase font-bold tracking-widest mt-1">Traer datos de la versión en la nube</p>
+        </div>
+        <div class="bg-white rounded-3xl shadow-2xl p-8">
+            <p class="text-xs text-slate-500 mb-6">
+                Entrá con el correo y la contraseña que usabas en Gradus. Se copian tus grados, alumnos, notas y anecdótico
+                a este dispositivo, y se descarga un respaldo por seguridad. Tus datos en la nube <b>no se borran</b>.
+            </p>
+            <div class="mb-4">
+                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Correo</label>
+                <input type="email" id="email" placeholder="tu@correo.com"
+                    class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400">
+            </div>
+            <div class="mb-6">
+                <label class="block text-[10px] font-black uppercase tracking-widest text-slate-400 mb-2">Contraseña</label>
+                <input type="password" id="password" placeholder="••••••••"
+                    class="w-full p-3 bg-slate-50 border border-slate-200 rounded-xl text-sm outline-none focus:ring-2 focus:ring-blue-400"
+                    onkeydown="if(event.key==='Enter') migrar()">
+            </div>
+            <button id="btn" onclick="migrar()"
+                class="w-full bg-blue-600 text-white py-3 rounded-xl font-black text-xs uppercase tracking-widest shadow-lg hover:bg-blue-700 transition-all">
+                <i class="fas fa-cloud-download-alt mr-2"></i>Traer mis datos
+            </button>
+            <p id="estado" class="text-xs text-center mt-4 text-slate-500"></p>
+            <a href="index.html" class="block text-center text-[10px] text-slate-400 hover:text-blue-600 font-bold mt-4">
+                <i class="fas fa-arrow-left mr-1"></i>Volver a Gradus
+            </a>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script type="module">
+        import * as db from './src/js/db.js';
+
+        const supabase = window.supabase.createClient(
+            'https://zzbllyqzmjmkkkirgbbc.supabase.co',
+            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6YmxseXF6bWpta2traXJnYmJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyNjU4MjcsImV4cCI6MjA4ODg0MTgyN30.5p4KLSQXGc0oNJnzk52MCLcRLp2yNJmwUYcGLHSf5Mc'
+        );
+
+        const estado = (texto, error = false) => {
+            const el = document.getElementById('estado');
+            el.textContent = texto;
+            el.className = 'text-xs text-center mt-4 ' + (error ? 'text-red-500 font-bold' : 'text-slate-500');
+        };
+
+        // Supabase devuelve máximo 1000 filas por consulta: se pide por páginas
+        async function traerTodo(tabla, filtro) {
+            const filas = [];
+            const PAGINA = 1000;
+            for (let desde = 0; ; desde += PAGINA) {
+                const { data, error } = await filtro(supabase.from(tabla).select('*')).range(desde, desde + PAGINA - 1);
+                if (error) throw new Error(`${tabla}: ${error.message}`);
+                filas.push(...data);
+                if (data.length < PAGINA) break;
+            }
+            return filas;
+        }
+
+        function descargar(datos) {
+            const blob = new Blob([JSON.stringify(datos)], { type: 'application/json' });
+            const url  = URL.createObjectURL(blob);
+            const a    = document.createElement('a');
+            a.href     = url;
+            a.download = `gradus-respaldo-nube-${new Date().toISOString().slice(0, 10)}.json`;
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            setTimeout(() => URL.revokeObjectURL(url), 1000);
+        }
+
+        window.migrar = async () => {
+            const email    = document.getElementById('email').value.trim();
+            const password = document.getElementById('password').value;
+            const btn      = document.getElementById('btn');
+            if (!email || !password) return estado('Completá correo y contraseña', true);
+
+            btn.disabled = true;
+            try {
+                estado('Iniciando sesión…');
+                const { data: auth, error } = await supabase.auth.signInWithPassword({ email, password });
+                if (error) throw new Error('Correo o contraseña incorrectos');
+                const user = auth.user;
+
+                estado('Descargando grados…');
+                const grados = await traerTodo('grados', q => q.eq('user_id', user.id));
+                const ids = grados.map(g => g.id);
+
+                let alumnos = [], tareas = [], anecdotico = [];
+                if (ids.length) {
+                    estado('Descargando alumnos y notas…');
+                    alumnos = await traerTodo('alumnos', q => q.in('grado_id', ids));
+                    estado('Descargando actividades…');
+                    tareas = await traerTodo('tareas', q => q.in('grado_id', ids));
+                    estado('Descargando anecdótico…');
+                    anecdotico = await traerTodo('anecdotico', q => q.in('grado_id', ids));
+                }
+
+                const ajustesActuales = await db.leerAjustes();
+                const respaldo = {
+                    app: 'gradus',
+                    version: 1,
+                    exportado: new Date().toISOString(),
+                    ajustes: ajustesActuales || {
+                        docente: user.user_metadata?.nombre || '',
+                        institucion: 'Instituto Diocesano San Juan Evangelista',
+                        anio: String(new Date().getFullYear())
+                    },
+                    grados, alumnos, tareas, anecdotico
+                };
+
+                // Copia de seguridad antes de tocar nada en el dispositivo
+                descargar(respaldo);
+
+                const locales = await db.todos('grados');
+                if (locales.length && !confirm(`En este dispositivo ya hay ${locales.length} grado(s).\n\nSe REEMPLAZARÁN por los ${grados.length} de la nube. ¿Continuar?`)) {
+                    estado('Cancelado. No se cambió nada en este dispositivo.');
+                    btn.disabled = false;
+                    return;
+                }
+
+                const r = await db.importarTodo(respaldo);
+                await supabase.auth.signOut();
+                estado(`✅ Listo: ${r.grados} grados, ${r.alumnos} alumnos, ${r.tareas} actividades y ${r.anecdotico} registros. Abriendo Gradus…`);
+                setTimeout(() => { window.location.href = 'index.html'; }, 2500);
+            } catch (err) {
+                estado('No se pudo completar: ' + err.message, true);
+                btn.disabled = false;
+            }
+        };
+    </script>
+</body>
+</html>

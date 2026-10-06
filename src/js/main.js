@@ -11,15 +11,14 @@ function calcularPeriodo(promCotidiana, promIntegradora, notaExamen, bonoFinal =
 }
 
 // ─────────────────────────────────────────────
-//  SUPABASE
+//  ALMACENAMIENTO LOCAL (antes: Supabase)
 // ─────────────────────────────────────────────
-const supabaseUrl = 'https://zzbllyqzmjmkkkirgbbc.supabase.co';
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp6YmxseXF6bWpta2traXJnYmJjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzMyNjU4MjcsImV4cCI6MjA4ODg0MTgyN30.5p4KLSQXGc0oNJnzk52MCLcRLp2yNJmwUYcGLHSf5Mc';
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+import * as db from './db.js';
 
 // ─────────────────────────────────────────────
 //  ESTADO
 // ─────────────────────────────────────────────
+let ajustes = null; // { docente, institucion, anio }
 let gradosCache = [];
 let gIdx = -1;
 let pAct = 1;
@@ -27,6 +26,11 @@ let pAct = 1;
 // ─────────────────────────────────────────────
 //  UTILIDADES
 // ─────────────────────────────────────────────
+// Evita que un texto escrito por el usuario se interprete como HTML
+const esc = (texto) => String(texto ?? '').replace(/[&<>"']/g, c => (
+    { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]
+));
+
 const ordenarAlumnos = (lista) => {
     const tieneOrden = lista.some(a => a.orden_manual !== undefined && a.orden_manual !== null);
     if (tieneOrden) {
@@ -67,20 +71,18 @@ function obtenerCalculos(al, tareasDelPeriodo) {
 //  VISTAS
 // ─────────────────────────────────────────────
 function mostrarVista(id) {
-    ['vista-auth', 'vista-grados', 'vista-selector-periodo', 'vista-detalle-grado', 'vista-reporte', 'vista-anecdotico'].forEach(v => {
+    ['vista-ajustes', 'vista-grados', 'vista-selector-periodo', 'vista-detalle-grado', 'vista-reporte', 'vista-anecdotico'].forEach(v => {
         const el = document.getElementById(v);
         if (el) el.classList.toggle('hidden', v !== id);
     });
 }
 
 window.mostrarGrados = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data, error } = await supabase.from('grados').select('*').eq('user_id', user.id).order('nombre');
-    if (error) { console.error('Error cargando grados:', error); return; }
-    gradosCache = data || [];
+    const data = await db.todos('grados');
+    gradosCache = data.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'));
     mostrarVista('vista-grados');
-    const nombre = user.user_metadata?.nombre || user.email;
-    document.getElementById('usuario-nombre').textContent = nombre;
+    document.getElementById('usuario-nombre').textContent = ajustes?.docente || '';
+    document.getElementById('subtitulo-institucion').textContent = 'Sistema Docente · ' + (ajustes?.institucion || '');
     renderGrados();
 };
 
@@ -88,12 +90,7 @@ window.crearGrado = async () => {
     const nombre = prompt('Nombre del grado (ej: 1° Bachillerato A):');
     if (!nombre || !nombre.trim()) return;
     const materia = prompt('Materia (opcional, ej: Informatica):') || '';
-    const { data: { user } } = await supabase.auth.getUser();
-    const { data, error } = await supabase
-        .from('grados')
-        .insert([{ nombre: nombre.trim().toUpperCase(), materia: materia.trim(), user_id: user.id }])
-        .select();
-    if (error) { alert('Error al crear grado: ' + error.message); return; }
+    const data = await db.insertar('grados', { nombre: nombre.trim().toUpperCase(), materia: materia.trim() });
     gradosCache.push(data[0]);
     renderGrados();
 };
@@ -106,11 +103,10 @@ window.editarGrado = async (id) => {
     if (!nuevoNombre.trim()) return alert('El nombre no puede estar vacío');
     const nuevaMateria = prompt('Materia (opcional, ej: Informática):', grado.materia || '');
     if (nuevaMateria === null) return;
-    const { error } = await supabase.from('grados').update({
+    await db.actualizar('grados', id, {
         nombre: nuevoNombre.trim().toUpperCase(),
         materia: nuevaMateria.trim()
-    }).eq('id', id);
-    if (error) { alert('Error: ' + error.message); return; }
+    });
     grado.nombre  = nuevoNombre.trim().toUpperCase();
     grado.materia = nuevaMateria.trim();
     renderGrados();
@@ -118,11 +114,10 @@ window.editarGrado = async (id) => {
 
 window.eliminarGrado = async (id, nombre) => {
     if (!confirm(`¿Eliminar "${nombre}" con TODOS sus alumnos y tareas? Esta acción no se puede deshacer.`)) return;
-    await supabase.from('alumnos').delete().eq('grado_id', id);
-    await supabase.from('tareas').delete().eq('grado_id', id);
-    await supabase.from('anecdotico').delete().eq('grado_id', id);
-    const { error } = await supabase.from('grados').delete().eq('id', id);
-    if (error) { alert('Error: ' + error.message); return; }
+    await db.borrarPorGrado('alumnos', id);
+    await db.borrarPorGrado('tareas', id);
+    await db.borrarPorGrado('anecdotico', id);
+    await db.borrar('grados', id);
     gradosCache = gradosCache.filter(g => g.id !== id);
     renderGrados();
 };
@@ -156,13 +151,13 @@ window.abrirGradoConPeriodo = async (id, periodo) => {
     gIdx = gradosCache.findIndex(g => g.id === id);
     if (gIdx === -1) return;
 
-    const [resAlumnos, resTareas] = await Promise.all([
-        supabase.from('alumnos').select('*').eq('grado_id', id),
-        supabase.from('tareas').select('*').eq('grado_id', id)
+    const [alumnos, tareas] = await Promise.all([
+        db.porGrado('alumnos', id),
+        db.porGrado('tareas', id)
     ]);
 
-    gradosCache[gIdx].alumnos = resAlumnos.data || [];
-    gradosCache[gIdx].tareas  = resTareas.data  || [];
+    gradosCache[gIdx].alumnos = alumnos;
+    gradosCache[gIdx].tareas  = tareas;
 
     document.getElementById('titulo-grado-actual').innerText = gradosCache[gIdx].nombre;
     mostrarVista('vista-detalle-grado');
@@ -181,11 +176,7 @@ window.agregarAlumno = async () => {
     const grado = gradosCache[gIdx];
     const yaExiste = grado.alumnos.some(a => a.nombre === nombre);
     if (yaExiste) return alert('Ese alumno ya está en la lista');
-    const { data, error } = await supabase
-        .from('alumnos')
-        .insert([{ grado_id: grado.id, nombre, notas: {}, puntos_extra: {}, recuperacion: {} }])
-        .select();
-    if (error) { alert('Error al agregar alumno: ' + error.message); return; }
+    const data = await db.insertar('alumnos', { grado_id: grado.id, nombre, notas: {}, puntos_extra: {}, recuperacion: {} });
     grado.alumnos.push(data[0]);
     input.value = '';
     renderDetalle();
@@ -210,8 +201,7 @@ window.importarExcel = async (event) => {
                 nuevos.push({ grado_id: grado.id, nombre, notas: {}, puntos_extra: {}, recuperacion: {} });
             }
             if (nuevos.length === 0) { alert('No se encontraron alumnos nuevos en el archivo.'); return; }
-            const { data, error } = await supabase.from('alumnos').insert(nuevos).select();
-            if (error) { alert('Error importando: ' + error.message); return; }
+            const data = await db.insertar('alumnos', nuevos);
             grado.alumnos.push(...data);
             renderDetalle();
             alert(`✅ ${data.length} alumno(s) importado(s) correctamente.`);
@@ -225,8 +215,7 @@ window.importarExcel = async (event) => {
 
 window.eliminarAlumno = async (alId) => {
     if (!confirm('¿Eliminar este alumno?')) return;
-    const { error } = await supabase.from('alumnos').delete().eq('id', alId);
-    if (error) { alert('Error: ' + error.message); return; }
+    await db.borrar('alumnos', alId);
     gradosCache[gIdx].alumnos = gradosCache[gIdx].alumnos.filter(a => a.id !== alId);
     renderDetalle();
 };
@@ -240,11 +229,7 @@ window.crearTarea = async () => {
     const fecha = document.getElementById('input-tarea-fecha').value;
     if (!nom)   return alert('Escribe el nombre de la tarea');
     if (!fecha) return alert('Selecciona una fecha');
-    const { data, error } = await supabase
-        .from('tareas')
-        .insert([{ grado_id: gradosCache[gIdx].id, nombre: nom.toUpperCase(), tipo, fecha, periodo: pAct }])
-        .select();
-    if (error) { alert('Error al crear tarea: ' + error.message); return; }
+    const data = await db.insertar('tareas', { grado_id: gradosCache[gIdx].id, nombre: nom.toUpperCase(), tipo, fecha, periodo: pAct });
     gradosCache[gIdx].tareas.push(data[0]);
     document.getElementById('input-tarea-nom').value = '';
     renderDetalle();
@@ -252,8 +237,7 @@ window.crearTarea = async () => {
 
 window.eliminarTarea = async (tId) => {
     if (!confirm('¿Eliminar esta tarea y todas sus notas?')) return;
-    const { error } = await supabase.from('tareas').delete().eq('id', tId);
-    if (error) { alert('Error: ' + error.message); return; }
+    await db.borrar('tareas', tId);
     gradosCache[gIdx].tareas = gradosCache[gIdx].tareas.filter(t => t.id !== tId);
     renderDetalle();
 };
@@ -267,8 +251,7 @@ window.guardarNota = async (alId, tId, val) => {
     if (!al.notas) al.notas = {};
     const nota = Math.min(10, Math.max(0, parseFloat(val) || 0));
     al.notas[tId] = nota;
-    const { error } = await supabase.from('alumnos').update({ notas: al.notas }).eq('id', alId);
-    if (error) console.error('Error guardando nota:', error);
+    await db.actualizar('alumnos', alId, { notas: al.notas });
     renderDetalle();
 };
 
@@ -278,8 +261,7 @@ window.guardarPuntoExtra = async (alId, tipo, val) => {
     if (!al.puntos_extra) al.puntos_extra = {};
     if (!al.puntos_extra[pAct]) al.puntos_extra[pAct] = { c: 0, i: 0, e: 0 };
     al.puntos_extra[pAct][tipo] = parseFloat(val) || 0;
-    const { error } = await supabase.from('alumnos').update({ puntos_extra: al.puntos_extra }).eq('id', alId);
-    if (error) console.error('Error guardando punto extra:', error);
+    await db.actualizar('alumnos', alId, { puntos_extra: al.puntos_extra });
     renderDetalle();
 };
 
@@ -329,8 +311,7 @@ window.guardarRecuperacion = async () => {
         al.recuperacion[pAct] = { c, i, e };
     }
 
-    const { error } = await supabase.from('alumnos').update({ recuperacion: al.recuperacion }).eq('id', alId);
-    if (error) { alert('Error guardando recuperación: ' + error.message); return; }
+    await db.actualizar('alumnos', alId, { recuperacion: al.recuperacion });
 
     cerrarModalRecuperacion();
     renderDetalle();
@@ -341,8 +322,7 @@ window.quitarRecuperacion = async (alId) => {
     const al = gradosCache[gIdx].alumnos.find(a => a.id === alId);
     if (!al || !al.recuperacion) return;
     delete al.recuperacion[pAct];
-    const { error } = await supabase.from('alumnos').update({ recuperacion: al.recuperacion }).eq('id', alId);
-    if (error) { alert('Error: ' + error.message); return; }
+    await db.actualizar('alumnos', alId, { recuperacion: al.recuperacion });
     renderDetalle();
 };
 
@@ -359,9 +339,15 @@ window.setPeriodo = (n) => {
     renderDetalle();
 };
 
+// Recordar qué paneles de detalle están abiertos para que no se cierren al guardar una nota
+const detallesAbiertos = new Set();
+
 window.toggleDetalle = (alId) => {
     const el = document.getElementById(`detalle-${alId}`);
-    if (el) el.classList.toggle('hidden');
+    if (!el) return;
+    el.classList.toggle('hidden');
+    if (el.classList.contains('hidden')) detallesAbiertos.delete(alId);
+    else detallesAbiertos.add(alId);
 };
 
 // ─────────────────────────────────────────────
@@ -379,7 +365,7 @@ function renderGrados() {
                 <h3 class="text-xl font-black text-slate-700 uppercase italic group-hover:text-blue-700 transition-colors">${g.nombre}</h3>
                 <p class="text-slate-400 text-[10px] mt-1 font-medium">${g.materia || ''}</p>
                 <p class="text-emerald-600 text-[10px] mt-2 font-bold uppercase italic">
-                    <i class="fas fa-cloud mr-1"></i>Nube Activa
+                    <i class="fas fa-mobile-alt mr-1"></i>Guardado en este dispositivo
                 </p>
             </div>
             <div class="border-t border-slate-100 px-4 py-3 flex justify-between items-center">
@@ -447,7 +433,7 @@ function renderDetalle() {
                 </button>
             </td>
         </tr>
-        <tr id="detalle-${al.id}" class="hidden bg-slate-50">
+        <tr id="detalle-${al.id}" class="${detallesAbiertos.has(al.id) ? '' : 'hidden'} bg-slate-50">
             <td colspan="8" class="p-6">
 
                 <!-- BOTÓN DE RECUPERACIÓN -->
@@ -607,9 +593,10 @@ window.generarReporte = () => {
 
     document.getElementById('reporte-contenido').innerHTML = `
         <div class="text-center mb-6">
-            <p class="text-[10px] text-slate-400 uppercase font-bold">Instituto Diocesano San Juan Evangelista</p>
-            <h1 class="text-xl font-black uppercase border-b-2 border-black pb-2 mt-1">Registro de Calificaciones 2026</h1>
+            <p class="text-[10px] text-slate-400 uppercase font-bold">${esc(ajustes?.institucion || '')}</p>
+            <h1 class="text-xl font-black uppercase border-b-2 border-black pb-2 mt-1">Registro de Calificaciones ${esc(ajustes?.anio || '')}</h1>
             <h2 class="text-lg font-bold mt-2 uppercase text-blue-900">${grado.nombre} — PERIODO ${pAct}</h2>
+            ${ajustes?.docente ? `<p class="text-[10px] text-slate-500 mt-1 uppercase font-bold">Docente: ${esc(ajustes.docente)}</p>` : ''}
             <p class="text-[10px] text-slate-500 mt-1">Generado: ${new Date().toLocaleDateString('es-SV', { dateStyle: 'long' })}</p>
         </div>
         <table class="w-full text-[9px] border-collapse border border-black">
@@ -653,59 +640,81 @@ window.cerrarReporte = () => {
 };
 
 // ─────────────────────────────────────────────
-//  AUTH
+//  AJUSTES (reemplaza al login: la app es del docente que la instaló)
 // ─────────────────────────────────────────────
-const CODIGO_ACCESO = 'IDSJE2026';
-
-window.switchTab = (tab) => {
-    document.getElementById('form-login').classList.toggle('hidden', tab !== 'login');
-    document.getElementById('form-registro').classList.toggle('hidden', tab !== 'registro');
+window.abrirAjustes = () => {
+    const primeraVez = !ajustes;
+    document.getElementById('ajustes-docente').value     = ajustes?.docente || '';
+    document.getElementById('ajustes-institucion').value = ajustes?.institucion || '';
+    document.getElementById('ajustes-anio').value        = ajustes?.anio || new Date().getFullYear();
+    document.getElementById('ajustes-titulo').textContent = primeraVez ? 'Bienvenido a Gradus' : 'Ajustes';
+    document.getElementById('ajustes-volver').classList.toggle('hidden', primeraVez);
+    document.getElementById('ajustes-error').classList.add('hidden');
+    mostrarVista('vista-ajustes');
 };
 
-window.hacerLogin = async () => {
-    const email    = document.getElementById('login-email').value.trim();
-    const password = document.getElementById('login-password').value;
-    const errEl    = document.getElementById('login-error');
-    errEl.classList.add('hidden');
-    if (!email || !password) { errEl.textContent = 'Completá todos los campos'; errEl.classList.remove('hidden'); return; }
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-    if (error) { errEl.textContent = 'Correo o contraseña incorrectos'; errEl.classList.remove('hidden'); return; }
+window.guardarAjustesForm = async () => {
+    const docente     = document.getElementById('ajustes-docente').value.trim();
+    const institucion = document.getElementById('ajustes-institucion').value.trim();
+    const anio        = document.getElementById('ajustes-anio').value.trim();
+    const errEl       = document.getElementById('ajustes-error');
+    if (!docente || !institucion || !anio) {
+        errEl.textContent = 'Completá los tres campos';
+        errEl.classList.remove('hidden');
+        return;
+    }
+    ajustes = { docente, institucion, anio };
+    await db.guardarAjustes(ajustes);
     mostrarGrados();
 };
 
-window.hacerRegistro = async () => {
-    const nombre   = document.getElementById('reg-nombre').value.trim();
-    const email    = document.getElementById('reg-email').value.trim();
-    const password = document.getElementById('reg-password').value;
-    const codigo   = document.getElementById('reg-codigo').value.trim();
-    const errEl    = document.getElementById('reg-error');
-    const okEl     = document.getElementById('reg-ok');
-    errEl.classList.add('hidden');
-    okEl.classList.add('hidden');
-    if (!nombre || !email || !password || !codigo) { errEl.textContent = 'Completá todos los campos'; errEl.classList.remove('hidden'); return; }
-    if (codigo !== CODIGO_ACCESO) { errEl.textContent = 'Código de acceso incorrecto'; errEl.classList.remove('hidden'); return; }
-    if (password.length < 6) { errEl.textContent = 'La contraseña debe tener al menos 6 caracteres'; errEl.classList.remove('hidden'); return; }
-    const { error } = await supabase.auth.signUp({ email, password, options: { data: { nombre } } });
-    if (error) { errEl.textContent = error.message; errEl.classList.remove('hidden'); return; }
-    okEl.textContent = '✅ Cuenta creada. Ya podés iniciar sesión.';
-    okEl.classList.remove('hidden');
-    switchTab('login');
+// ─────────────────────────────────────────────
+//  RESPALDO (exportar / importar)
+// ─────────────────────────────────────────────
+window.exportarRespaldo = async () => {
+    const datos = await db.exportarTodo();
+    const blob  = new Blob([JSON.stringify(datos)], { type: 'application/json' });
+    const url   = URL.createObjectURL(blob);
+    const a     = document.createElement('a');
+    a.href      = url;
+    a.download  = `gradus-respaldo-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
 };
 
-window.cerrarSesion = async () => {
-    await supabase.auth.signOut();
-    mostrarVista('vista-auth');
+window.importarRespaldo = (event) => {
+    const file = event.target.files[0];
+    event.target.value = '';
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = async (e) => {
+        try {
+            const datos = JSON.parse(e.target.result);
+            db.validarRespaldo(datos);
+            const n = datos.grados.length;
+            if (!confirm(`Este respaldo tiene ${n} grado(s).\n\nSe REEMPLAZARÁ todo lo que hay ahora en este dispositivo. ¿Continuar?`)) return;
+            const r = await db.importarTodo(datos);
+            ajustes = await db.leerAjustes();
+            alert(`✅ Respaldo cargado: ${r.grados} grados, ${r.alumnos} alumnos, ${r.tareas} actividades, ${r.anecdotico} registros anecdóticos.`);
+            if (ajustes) mostrarGrados(); else abrirAjustes();
+        } catch (err) {
+            alert('No se pudo cargar el respaldo: ' + err.message);
+        }
+    };
+    reader.readAsText(file);
 };
 
 // ─────────────────────────────────────────────
 //  INICIO
 // ─────────────────────────────────────────────
 (async () => {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (session) {
+    ajustes = await db.leerAjustes();
+    if (ajustes) {
         mostrarGrados();
     } else {
-        mostrarVista('vista-auth');
+        abrirAjustes();
     }
 })();
 
@@ -726,8 +735,7 @@ window.editarTarea = async (tId) => {
     if (nuevoTipoStr === null) return;
     const nuevoTipo = nuevoTipoStr.trim().toLowerCase();
     if (!['c', 'i', 'e'].includes(nuevoTipo)) return alert('Tipo inválido. Usá c, i o e.');
-    const { error } = await supabase.from('tareas').update({ nombre: nuevoNombre.trim().toUpperCase(), tipo: nuevoTipo }).eq('id', tId);
-    if (error) { alert('Error al editar: ' + error.message); return; }
+    await db.actualizar('tareas', tId, { nombre: nuevoNombre.trim().toUpperCase(), tipo: nuevoTipo });
     tarea.nombre = nuevoNombre.trim().toUpperCase();
     tarea.tipo   = nuevoTipo;
     renderDetalle();
@@ -739,8 +747,7 @@ window.editarAlumno = async (alId) => {
     const nuevoNombre = prompt('Nombre del alumno (APELLIDOS, NOMBRES):', al.nombre);
     if (nuevoNombre === null) return;
     if (!nuevoNombre.trim()) return alert('El nombre no puede estar vacío');
-    const { error } = await supabase.from('alumnos').update({ nombre: nuevoNombre.trim().toUpperCase() }).eq('id', alId);
-    if (error) { alert('Error al editar: ' + error.message); return; }
+    await db.actualizar('alumnos', alId, { nombre: nuevoNombre.trim().toUpperCase() });
     al.nombre = nuevoNombre.trim().toUpperCase();
     renderDetalle();
 };
@@ -753,7 +760,7 @@ window.moverAlumno = (alId, direccion) => {
     if (nuevoIdx < 0 || nuevoIdx >= lista.length) return;
     [lista[idx], lista[nuevoIdx]] = [lista[nuevoIdx], lista[idx]];
     lista.forEach((a, i) => { a.orden_manual = i; });
-    lista.forEach(a => supabase.from('alumnos').update({ orden_manual: a.orden_manual }).eq('id', a.id));
+    lista.forEach(a => db.actualizar('alumnos', a.id, { orden_manual: a.orden_manual }));
     renderDetalle();
 };
 
@@ -776,8 +783,7 @@ window.abrirAnecdotico = async (gradoId) => {
     if (!grado) return;
     anecGradoId = gradoId;
     if (!grado.alumnos) {
-        const { data } = await supabase.from('alumnos').select('*').eq('grado_id', gradoId);
-        grado.alumnos = data || [];
+        grado.alumnos = await db.porGrado('alumnos', gradoId);
     }
     const sel = document.getElementById('anec-alumno');
     sel.innerHTML = '<option value="">— Seleccionar alumno —</option>' +
@@ -810,10 +816,9 @@ window.guardarRegistroAnec = async () => {
     if (!alId)  return alert('Seleccioná un alumno');
     if (!fecha) return alert('Seleccioná una fecha');
     if (!desc)  return alert('Escribí una descripción');
-    const { error } = await supabase.from('anecdotico').insert([{
+    await db.insertar('anecdotico', {
         grado_id: anecGradoId, alumno_id: alId, tipo, fecha, descripcion: desc, periodo: anecPeriodo
-    }]);
-    if (error) { alert('Error al guardar: ' + error.message); return; }
+    });
     document.getElementById('anec-descripcion').value = '';
     document.getElementById('anec-alumno').value = '';
     await renderAnecdotico();
@@ -821,19 +826,23 @@ window.guardarRegistroAnec = async () => {
 
 window.eliminarRegistroAnec = async (id) => {
     if (!confirm('¿Eliminar este registro?')) return;
-    const { error } = await supabase.from('anecdotico').delete().eq('id', id);
-    if (error) { alert('Error: ' + error.message); return; }
+    await db.borrar('anecdotico', id);
     await renderAnecdotico();
 };
 
+// Registros del grado y periodo, con el nombre del alumno (antes era un join de Supabase)
+async function cargarRegistrosAnec(ascendente) {
+    const grado = gradosCache.find(g => g.id === anecGradoId);
+    const nombres = Object.fromEntries((grado?.alumnos || []).map(a => [a.id, a.nombre]));
+    const registros = (await db.porGrado('anecdotico', anecGradoId))
+        .filter(r => r.periodo === anecPeriodo)
+        .map(r => ({ ...r, alumnos: { nombre: nombres[r.alumno_id] || '' } }));
+    registros.sort((a, b) => ascendente ? a.fecha.localeCompare(b.fecha) : b.fecha.localeCompare(a.fecha));
+    return registros;
+}
+
 async function renderAnecdotico() {
-    const { data: registros, error } = await supabase
-        .from('anecdotico')
-        .select('*, alumnos(nombre)')
-        .eq('grado_id', anecGradoId)
-        .eq('periodo', anecPeriodo)
-        .order('fecha', { ascending: false });
-    if (error) { console.error(error); return; }
+    const registros = await cargarRegistrosAnec(false);
     const lista = document.getElementById('lista-anecdotico');
     if (!registros || registros.length === 0) {
         lista.innerHTML = `
@@ -862,7 +871,7 @@ async function renderAnecdotico() {
                         <i class="fas fa-calendar mr-1"></i>${fechaFmt}
                     </span>
                 </div>
-                <p class="text-sm text-slate-600 mt-2 leading-relaxed">${r.descripcion}</p>
+                <p class="text-sm text-slate-600 mt-2 leading-relaxed">${esc(r.descripcion)}</p>
             </div>
             <button onclick="eliminarRegistroAnec('${r.id}')"
                 class="text-slate-300 hover:text-red-400 transition-colors mt-0.5 flex-shrink-0" title="Eliminar">
@@ -874,12 +883,7 @@ async function renderAnecdotico() {
 
 window.imprimirAnecdotico = async () => {
     const grado = gradosCache.find(g => g.id === anecGradoId);
-    const { data: registros } = await supabase
-        .from('anecdotico')
-        .select('*, alumnos(nombre)')
-        .eq('grado_id', anecGradoId)
-        .eq('periodo', anecPeriodo)
-        .order('fecha', { ascending: true });
+    const registros = await cargarRegistrosAnec(true);
     const filas = (registros || []).map((r, i) => {
         const cfg = TIPO_CONFIG[r.tipo] || TIPO_CONFIG.neutral;
         const fechaFmt = new Date(r.fecha + 'T12:00:00').toLocaleDateString('es-SV', {
@@ -891,7 +895,7 @@ window.imprimirAnecdotico = async () => {
             <td style="padding:6px;font-size:10px;font-weight:700;text-transform:uppercase">${r.alumnos?.nombre || ''}</td>
             <td style="padding:6px;text-align:center;font-size:11px">${cfg.emoji} ${cfg.label}</td>
             <td style="padding:6px;font-size:10px;text-align:center">${fechaFmt}</td>
-            <td style="padding:6px;font-size:10px">${r.descripcion}</td>
+            <td style="padding:6px;font-size:10px">${esc(r.descripcion)}</td>
         </tr>`;
     }).join('');
     const win = window.open('', '_blank');
@@ -900,8 +904,8 @@ window.imprimirAnecdotico = async () => {
         <style>body{font-family:sans-serif;padding:24px} table{width:100%;border-collapse:collapse} th{background:#1e1b4b;color:white;padding:8px;font-size:10px;text-transform:uppercase} @media print{button{display:none}}</style>
         </head><body>
         <div style="text-align:center;margin-bottom:16px">
-            <p style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700">Instituto Diocesano San Juan Evangelista</p>
-            <h1 style="font-size:18px;font-weight:900;margin:4px 0">Registro Anecdótico 2026</h1>
+            <p style="font-size:10px;color:#64748b;text-transform:uppercase;font-weight:700">${esc(ajustes?.institucion || '')}</p>
+            <h1 style="font-size:18px;font-weight:900;margin:4px 0">Registro Anecdótico ${esc(ajustes?.anio || '')}</h1>
             <h2 style="font-size:14px;font-weight:700;color:#1e1b4b">${grado?.nombre} — Periodo ${anecPeriodo}</h2>
         </div>
         <table>
