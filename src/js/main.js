@@ -1,13 +1,21 @@
 // ─────────────────────────────────────────────
 //  LÓGICA DE CÁLCULO (inline, sin importar logica.js)
 // ─────────────────────────────────────────────
+// Redondeo a 1 decimal "como en boleta": 8.05 -> 8.1, 8.04 -> 8.0
+// (corrige errores de JavaScript como 8.049999999999999)
+function redondear1(x) {
+    const n = parseFloat(x) || 0;
+    return Math.round(parseFloat(n.toFixed(6)) * 10) / 10;
+}
+const fmt1 = (x) => redondear1(x).toFixed(1);
+
 function calcularPeriodo(promCotidiana, promIntegradora, notaExamen, bonoFinal = 0) {
     const pC = parseFloat(promCotidiana) || 0;
     const pI = parseFloat(promIntegradora) || 0;
     const nE = parseFloat(notaExamen) || 0;
     const bF = parseFloat(bonoFinal) || 0;
     const final = Math.min(10, (pC * 0.35) + (pI * 0.35) + (nE * 0.30) + bF);
-    return { notaFinal: final.toFixed(1) };
+    return { notaFinal: fmt1(final) };
 }
 
 // ─────────────────────────────────────────────
@@ -439,9 +447,9 @@ function renderDetalle() {
             <td class="p-4 text-center font-bold text-slate-300 text-[10px]">${idx + 1}</td>
             <td class="p-4 font-black text-[10px] uppercase text-slate-800">${ap}</td>
             <td class="p-4 text-[10px] uppercase text-slate-500 font-medium">${nom}</td>
-            <td class="p-4 text-center font-bold text-[10px] ${d.pC >= 6 ? 'text-emerald-500' : 'text-red-400'}">${d.pC.toFixed(1)}</td>
-            <td class="p-4 text-center font-bold text-[10px] ${d.pI >= 6 ? 'text-emerald-500' : 'text-red-400'}">${d.pI.toFixed(1)}</td>
-            <td class="p-4 text-center font-bold text-[10px] ${d.nE >= 6 ? 'text-emerald-500' : 'text-red-400'}">${d.nE.toFixed(1)}</td>
+            <td class="p-4 text-center font-bold text-[10px] ${d.pC >= 6 ? 'text-emerald-500' : 'text-red-400'}">${fmt1(d.pC)}</td>
+            <td class="p-4 text-center font-bold text-[10px] ${d.pI >= 6 ? 'text-emerald-500' : 'text-red-400'}">${fmt1(d.pI)}</td>
+            <td class="p-4 text-center font-bold text-[10px] ${d.nE >= 6 ? 'text-emerald-500' : 'text-red-400'}">${fmt1(d.nE)}</td>
             <td class="p-4 text-center font-black bg-slate-50/50 text-base italic underline ${colorF}">${d.r.notaFinal}${badgeRecup}</td>
             <td class="p-4 text-center">
                 <button onclick="toggleDetalle('${al.id}')" class="text-blue-600 bg-blue-50 w-8 h-8 rounded-full shadow-sm hover:bg-blue-100">
@@ -595,11 +603,11 @@ window.generarReporte = () => {
             <td class="border border-black text-center p-1">${idx + 1}</td>
             <td class="border border-black p-1 uppercase font-bold text-left">${al.nombre}${esR ? ' <span style="font-size:7px;background:#fef3c7;color:#92400e;padding:1px 4px;border-radius:4px;font-weight:900">RECUP</span>' : ''}</td>
             ${tCot.map(t => `<td class="border border-black text-center p-1">${esR ? '—' : (notas[t.id] !== undefined ? notas[t.id] : '-')}</td>`).join('')}
-            <td class="border border-black text-center font-black bg-emerald-50 p-1">${d.pC.toFixed(1)}</td>
+            <td class="border border-black text-center font-black bg-emerald-50 p-1">${fmt1(d.pC)}</td>
             ${tInt.map(t => `<td class="border border-black text-center p-1">${esR ? '—' : (notas[t.id] !== undefined ? notas[t.id] : '-')}</td>`).join('')}
-            <td class="border border-black text-center font-black bg-orange-50 p-1">${d.pI.toFixed(1)}</td>
-            <td class="border border-black text-center p-1">${esR ? '—' : d.baseExamen.toFixed(1)}</td>
-            <td class="border border-black text-center font-black bg-purple-50 p-1">${d.nE.toFixed(1)}</td>
+            <td class="border border-black text-center font-black bg-orange-50 p-1">${fmt1(d.pI)}</td>
+            <td class="border border-black text-center p-1">${esR ? '—' : fmt1(d.baseExamen)}</td>
+            <td class="border border-black text-center font-black bg-purple-50 p-1">${fmt1(d.nE)}</td>
             <td class="border border-black text-center font-black text-xs bg-slate-100 p-1 ${parseFloat(d.r.notaFinal) >= 6 ? 'text-emerald-700' : 'text-red-600'}">${d.r.notaFinal}</td>
         </tr>`;
     }).join('');
@@ -657,10 +665,22 @@ window.cerrarReporte = () => {
 // ─────────────────────────────────────────────
 //  RESULTADO FINAL DEL AÑO (solo lectura: no guarda nada en la base)
 // ─────────────────────────────────────────────
-const NOTA_APROBACION = 6.0;
+const ESTADOS_FINALES = [
+    { id: 'critico',    label: 'Crítico',    rango: '0.0 – 3.9',  min: 0,   fila: 'bg-red-50',     texto: 'text-red-700',     chip: 'bg-red-100 text-red-700 border-red-300' },
+    { id: 'riesgo',     label: 'En riesgo',  rango: '4.0 – 6.4',  min: 4,   fila: 'bg-amber-50',   texto: 'text-amber-700',   chip: 'bg-amber-100 text-amber-800 border-amber-300' },
+    { id: 'aprobado',   label: 'Aprobado',   rango: '6.5 – 7.9',  min: 6.5, fila: '',              texto: 'text-emerald-700', chip: 'bg-emerald-100 text-emerald-700 border-emerald-300' },
+    { id: 'excelencia', label: 'Excelencia', rango: '8.0 – 10.0', min: 8,   fila: 'bg-blue-50/60', texto: 'text-blue-700',    chip: 'bg-blue-100 text-blue-700 border-blue-300' }
+];
+const NOTA_APROBACION = 6.5;
+let filtroEstadoFinal = 'todos';
+
+function estadoFinal(promedio) {
+    let e = ESTADOS_FINALES[0];
+    for (const x of ESTADOS_FINALES) if (promedio >= x.min) e = x;
+    return e;
+}
 let finalVolverA = 'vista-detalle-grado';
 
-const redondear1 = (x) => Math.round((x + Number.EPSILON) * 10) / 10;
 
 // Un período cuenta si el grado ya tiene actividades en él,
 // o si el alumno tiene recuperación registrada en ese período.
@@ -675,7 +695,7 @@ function calcularFinalAlumno(grado, al) {
     const validos  = periodos.filter(Boolean);
     const suma     = redondear1(validos.reduce((s, x) => s + x.nota, 0));
     const promedio = validos.length ? redondear1(suma / validos.length) : 0;
-    return { periodos, suma, promedio, contados: validos.length, aprobado: promedio >= NOTA_APROBACION };
+    return { periodos, suma, promedio, contados: validos.length, aprobado: promedio >= NOTA_APROBACION, estado: estadoFinal(promedio) };
 }
 
 function periodosConActividades(grado) {
@@ -695,6 +715,7 @@ window.abrirResultadoFinal = async (id) => {
     gradosCache[gIdx].tareas  = resTareas.data  || [];
     document.getElementById('titulo-grado-actual').innerText = gradosCache[gIdx].nombre;
     finalVolverA = 'vista-selector-periodo';
+    filtroEstadoFinal = 'todos';
     renderResultadoFinal();
 };
 
@@ -702,6 +723,7 @@ window.abrirResultadoFinal = async (id) => {
 window.verResultadoFinal = () => {
     if (!gradosCache[gIdx]) return;
     finalVolverA = 'vista-detalle-grado';
+    filtroEstadoFinal = 'todos';
     renderResultadoFinal();
 };
 
@@ -720,8 +742,14 @@ function renderResultadoFinal() {
     const conAct  = periodosConActividades(grado);
     const parcial = conAct.length < 4;
 
-    const filas = alumnos.map((al, idx) => {
-        const f = calcularFinalAlumno(grado, al);
+    const resultados = alumnos.map(al => ({ al, f: calcularFinalAlumno(grado, al) }));
+    const conteo = {};
+    ESTADOS_FINALES.forEach(e => { conteo[e.id] = resultados.filter(r => r.f.contados && r.f.estado.id === e.id).length; });
+    const visibles = filtroEstadoFinal === 'todos'
+        ? resultados
+        : resultados.filter(r => r.f.contados && r.f.estado.id === filtroEstadoFinal);
+
+    const filas = visibles.map(({ al, f }, idx) => {
         const celdas = f.periodos.map(p => {
             if (!p) return `<td class="border border-slate-300 text-center p-2 text-slate-300">—</td>`;
             const color = p.nota >= NOTA_APROBACION ? 'text-slate-700' : 'text-red-600 font-black';
@@ -729,29 +757,40 @@ function renderResultadoFinal() {
             return `<td class="border border-slate-300 text-center p-2 font-bold ${color}">${p.nota.toFixed(1)}${badge}</td>`;
         }).join('');
         return `
-        <tr class="${f.aprobado ? '' : 'bg-red-50'}">
+        <tr class="${f.contados ? f.estado.fila : ''}">
             <td class="border border-slate-300 text-center p-2 text-slate-400 font-bold">${idx + 1}</td>
             <td class="border border-slate-300 p-2 font-bold uppercase text-slate-800">${al.nombre}</td>
             ${celdas}
             <td class="border border-slate-300 text-center p-2 font-black bg-blue-50 text-blue-900">${f.suma.toFixed(1)}</td>
-            <td class="border border-slate-300 text-center p-2 font-black text-base bg-slate-100 ${f.aprobado ? 'text-emerald-700' : 'text-red-600'}">${f.promedio.toFixed(1)}</td>
-            <td class="border border-slate-300 text-center p-2 text-[10px] font-black uppercase ${f.aprobado ? 'text-emerald-700' : 'text-red-600'}">${f.contados ? (f.aprobado ? 'Aprobado' : 'Reprobado') : '—'}</td>
+            <td class="border border-slate-300 text-center p-2 font-black text-base bg-slate-100 ${f.contados ? f.estado.texto : 'text-slate-300'}">${f.contados ? f.promedio.toFixed(1) : '—'}</td>
+            <td class="border border-slate-300 text-center p-2 text-[10px] font-black uppercase ${f.estado.texto}">${f.contados ? f.estado.label : '—'}</td>
         </tr>`;
     }).join('');
 
-    const resultados = alumnos.map(al => calcularFinalAlumno(grado, al));
-    const aprobados  = resultados.filter(r => r.contados && r.aprobado).length;
-    const reprobados = resultados.filter(r => r.contados && !r.aprobado).length;
+    const chips = [{ id: 'todos', label: 'Todos', rango: '', chip: 'bg-slate-100 text-slate-700 border-slate-300' }, ...ESTADOS_FINALES]
+        .map(e => {
+            const n = e.id === 'todos' ? resultados.length : conteo[e.id];
+            const activo = filtroEstadoFinal === e.id;
+            return `<button onclick="filtrarEstadoFinal('${e.id}')"
+                class="border-2 rounded-2xl px-4 py-2 text-left transition-all ${e.chip} ${activo ? 'ring-2 ring-offset-2 ring-slate-700 scale-105' : 'opacity-80 hover:opacity-100'}">
+                <span class="block text-[10px] font-black uppercase">${e.label}</span>
+                <span class="block text-xl font-black leading-none mt-1">${n}</span>
+                ${e.rango ? `<span class="block text-[9px] font-bold opacity-70 mt-1">${e.rango}</span>` : ''}
+            </button>`;
+        }).join('');
+    const filtroActivo = ESTADOS_FINALES.find(e => e.id === filtroEstadoFinal);
 
     document.getElementById('final-contenido').innerHTML = `
         <div class="text-center mb-6">
             <p class="text-[10px] text-slate-400 uppercase font-bold">Instituto Diocesano San Juan Evangelista</p>
             <h1 class="text-xl font-black uppercase border-b-2 border-black pb-2 mt-1">Resultado Final ${new Date().getFullYear()}</h1>
             <h2 class="text-lg font-bold mt-2 uppercase text-blue-900">${grado.nombre}${grado.materia ? ' — ' + grado.materia : ''}</h2>
+            ${filtroActivo ? `<p class="text-sm font-black uppercase mt-1 ${filtroActivo.texto}">Alumnos: ${filtroActivo.label} (${filtroActivo.rango})</p>` : ''}
             <p class="text-[10px] text-slate-500 mt-1">Generado: ${new Date().toLocaleDateString('es-SV', { dateStyle: 'long' })}</p>
             ${parcial ? `<p class="no-print mt-3 inline-block text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-300 rounded-full px-3 py-1">
                 <i class="fas fa-info-circle mr-1"></i>Promedio parcial: hay actividades en ${conAct.length} de 4 períodos</p>` : ''}
         </div>
+        <div class="no-print flex flex-wrap justify-center gap-3 mb-6">${chips}</div>
         <div class="overflow-x-auto">
         <table class="w-full text-[11px] border-collapse border border-slate-400 min-w-[640px]">
             <thead>
@@ -767,14 +806,13 @@ function renderResultadoFinal() {
                     <th class="border border-slate-400 p-2">Estado</th>
                 </tr>
             </thead>
-            <tbody>${filas || `<tr><td colspan="9" class="p-6 text-center text-slate-400 italic">No hay alumnos en este grado.</td></tr>`}</tbody>
+            <tbody>${filas || `<tr><td colspan="9" class="p-6 text-center text-slate-400 italic">${filtroActivo ? 'Ningún alumno en este estado.' : 'No hay alumnos en este grado.'}</td></tr>`}</tbody>
         </table>
         </div>
         <div class="mt-4 flex flex-wrap gap-6 text-[11px] font-bold">
             <span>Total alumnos: <b>${alumnos.length}</b></span>
-            <span class="text-emerald-700">Aprobados: <b>${aprobados}</b></span>
-            <span class="text-red-600">Reprobados: <b>${reprobados}</b></span>
-            <span class="text-slate-400 font-medium">Aprobación: ${NOTA_APROBACION.toFixed(1)} · <sup class="text-amber-600 font-black">R</sup> = período con recuperación</span>
+            ${ESTADOS_FINALES.map(e => `<span class="${e.texto}">${e.label}: <b>${conteo[e.id]}</b></span>`).join('')}
+            <span class="text-slate-400 font-medium"><sup class="text-amber-600 font-black">R</sup> = período con recuperación</span>
         </div>
         <div class="mt-8 grid grid-cols-3 gap-8 text-center text-[10px] pt-8">
             <div class="border-t border-black pt-2"><p class="font-bold uppercase">Docente</p></div>
@@ -784,6 +822,11 @@ function renderResultadoFinal() {
     `;
     mostrarVista('vista-final');
 }
+
+window.filtrarEstadoFinal = (id) => {
+    filtroEstadoFinal = id;
+    renderResultadoFinal();
+};
 
 window.exportarFinalExcel = () => {
     const grado = gradosCache[gIdx];
@@ -804,24 +847,23 @@ window.exportarFinalExcel = () => {
         [],
         ['Nº', 'APELLIDOS Y NOMBRES', 'P1', 'P2', 'P3', 'P4', 'SUMA', 'PROMEDIO', 'ESTADO']
     ];
-    let aprobados = 0, reprobados = 0;
+    const conteo = {};
+    ESTADOS_FINALES.forEach(e => { conteo[e.id] = 0; });
     alumnos.forEach((al, i) => {
         const f = calcularFinalAlumno(grado, al);
-        if (f.contados) f.aprobado ? aprobados++ : reprobados++;
+        if (f.contados) conteo[f.estado.id]++;
         hoja1.push([
             i + 1,
             al.nombre,
             ...f.periodos.map(p => p ? p.nota : ''),
             f.suma,
             f.promedio,
-            f.contados ? (f.aprobado ? 'APROBADO' : 'REPROBADO') : ''
+            f.contados ? f.estado.label.toUpperCase() : ''
         ]);
     });
     hoja1.push([]);
     hoja1.push(['', 'Total alumnos', alumnos.length]);
-    hoja1.push(['', 'Aprobados', aprobados]);
-    hoja1.push(['', 'Reprobados', reprobados]);
-    hoja1.push(['', `Nota de aprobación: ${NOTA_APROBACION.toFixed(1)}`]);
+    ESTADOS_FINALES.forEach(e => hoja1.push(['', `${e.label} (${e.rango})`, conteo[e.id]]));
 
     const ws1 = XLSX.utils.aoa_to_sheet(hoja1);
     ws1['!cols'] = [{ wch: 5 }, { wch: 40 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 9 }, { wch: 10 }, { wch: 12 }];
