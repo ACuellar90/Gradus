@@ -10,8 +10,17 @@
         @media print {
             .no-print { display: none !important; }
             .print-area { border: none !important; padding: 0 !important; }
+            .final-scroll { overflow: visible !important; }
+            .final-thead th { position: static !important; }
             body { background: white; }
         }
+        /* Resultado final: encabezados fijos al desplazar la tabla */
+        .final-thead th {
+            position: sticky; top: 0; z-index: 10;
+            background: #1e293b; box-shadow: 0 2px 0 #94a3b8;
+        }
+        .final-thead th.bg-blue-700 { background: #1d4ed8; }
+        .final-thead th.bg-blue-900 { background: #1e3a8a; }
         .auth-bg {
             background: linear-gradient(135deg, #1e3a5f 0%, #1a2e4a 50%, #0f1f35 100%);
         }

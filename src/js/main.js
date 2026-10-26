@@ -791,9 +791,9 @@ function renderResultadoFinal() {
                 <i class="fas fa-info-circle mr-1"></i>Promedio parcial: hay actividades en ${conAct.length} de 4 períodos</p>` : ''}
         </div>
         <div class="no-print flex flex-wrap justify-center gap-3 mb-6">${chips}</div>
-        <div class="overflow-x-auto">
+        <div class="final-scroll overflow-x-auto md:overflow-visible">
         <table class="w-full text-[11px] border-collapse border border-slate-400 min-w-[640px]">
-            <thead>
+            <thead class="final-thead">
                 <tr class="bg-slate-800 text-white text-[10px] uppercase">
                     <th class="border border-slate-400 p-2 w-10">Nº</th>
                     <th class="border border-slate-400 p-2 text-left">Apellidos y nombres</th>
