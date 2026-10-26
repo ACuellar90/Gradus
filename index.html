@@ -118,6 +118,10 @@
                         <div class="text-[10px] font-bold text-slate-400">Cuarto Período</div>
                     </button>
                 </div>
+                <button id="sp-btn-final"
+                    class="mt-4 w-full py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all shadow-sm border-2 bg-amber-50 text-amber-800 border-amber-300 hover:border-amber-500 hover:shadow-md">
+                    <i class="fas fa-trophy mr-2"></i>Resultado final del año
+                </button>
             </div>
         </div>
     </section>
@@ -202,6 +206,11 @@
                     <button onclick="setPeriodo(3)" class="px-4 py-1 rounded-md font-bold text-xs">P3</button>
                     <button onclick="setPeriodo(4)" class="px-4 py-1 rounded-md font-bold text-xs">P4</button>
                 </div>
+                <button onclick="verResultadoFinal()"
+                    class="bg-amber-400 hover:bg-amber-500 text-amber-950 px-4 py-2 rounded-xl font-black text-xs shadow-lg uppercase transition-all"
+                    title="Suma y promedio de los 4 períodos">
+                    <i class="fas fa-trophy mr-1"></i>Final
+                </button>
                 <button onclick="generarReporte()"
                     class="bg-emerald-500 hover:bg-emerald-600 text-white px-4 py-2 rounded-xl font-bold text-xs shadow-lg uppercase transition-all">
                     <i class="fas fa-file-alt mr-1"></i>Reporte
@@ -284,6 +293,29 @@
                     <i class="fas fa-print mr-2"></i>IMPRIMIR / PDF
                 </button>
                 <button onclick="cerrarReporte()"
+                    class="bg-slate-800 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-slate-900 transition-all">
+                    <i class="fas fa-arrow-left mr-2"></i>VOLVER
+                </button>
+            </footer>
+        </div>
+    </section>
+
+    <!-- ═══════════════════════════════════════
+         VISTA 3B: RESULTADO FINAL DEL AÑO
+    ═══════════════════════════════════════ -->
+    <section id="vista-final" class="hidden min-h-screen bg-slate-100 p-4 md:p-8">
+        <div class="max-w-5xl mx-auto">
+            <div id="final-contenido" class="bg-white border-2 border-slate-800 p-6 md:p-8 shadow-2xl print-area rounded-2xl"></div>
+            <footer class="mt-8 flex flex-wrap justify-center gap-4 no-print">
+                <button onclick="exportarFinalExcel()"
+                    class="bg-emerald-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-emerald-700 transition-all">
+                    <i class="fas fa-file-excel mr-2"></i>DESCARGAR EXCEL
+                </button>
+                <button onclick="window.print()"
+                    class="bg-blue-600 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-blue-700 transition-all">
+                    <i class="fas fa-print mr-2"></i>IMPRIMIR / PDF
+                </button>
+                <button onclick="cerrarResultadoFinal()"
                     class="bg-slate-800 text-white px-8 py-3 rounded-xl font-bold shadow-lg hover:bg-slate-900 transition-all">
                     <i class="fas fa-arrow-left mr-2"></i>VOLVER
                 </button>

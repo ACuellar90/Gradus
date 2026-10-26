@@ -35,10 +35,10 @@ const ordenarAlumnos = (lista) => {
     return lista.sort((a, b) => a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' }));
 };
 
-function obtenerCalculos(al, tareasDelPeriodo) {
+function obtenerCalculos(al, tareasDelPeriodo, periodo = pAct) {
     const notas = al.notas || {};
-    const bono  = (al.puntos_extra || {})[pAct] || { c: 0, i: 0, e: 0, f: 0 };
-    const recup = (al.recuperacion || {})[pAct] || null;
+    const bono  = (al.puntos_extra || {})[periodo] || { c: 0, i: 0, e: 0, f: 0 };
+    const recup = (al.recuperacion || {})[periodo] || null;
 
     // Si hay recuperación, usarla en lugar de las notas normales
     if (recup) {
@@ -67,7 +67,7 @@ function obtenerCalculos(al, tareasDelPeriodo) {
 //  VISTAS
 // ─────────────────────────────────────────────
 function mostrarVista(id) {
-    ['vista-auth', 'vista-grados', 'vista-selector-periodo', 'vista-detalle-grado', 'vista-reporte', 'vista-anecdotico'].forEach(v => {
+    ['vista-auth', 'vista-grados', 'vista-selector-periodo', 'vista-detalle-grado', 'vista-reporte', 'vista-anecdotico', 'vista-final'].forEach(v => {
         const el = document.getElementById(v);
         if (el) el.classList.toggle('hidden', v !== id);
     });
@@ -147,6 +147,8 @@ window.abrirSelectorPeriodo = (id) => {
         }`;
         btn.onclick = () => abrirGradoConPeriodo(id, p);
     });
+    const btnFinal = document.getElementById('sp-btn-final');
+    if (btnFinal) btnFinal.onclick = () => abrirResultadoFinal(id);
 
     mostrarVista('vista-selector-periodo');
 };
@@ -650,6 +652,215 @@ window.generarReporte = () => {
 
 window.cerrarReporte = () => {
     mostrarVista('vista-detalle-grado');
+};
+
+// ─────────────────────────────────────────────
+//  RESULTADO FINAL DEL AÑO (solo lectura: no guarda nada en la base)
+// ─────────────────────────────────────────────
+const NOTA_APROBACION = 6.0;
+let finalVolverA = 'vista-detalle-grado';
+
+const redondear1 = (x) => Math.round((x + Number.EPSILON) * 10) / 10;
+
+// Un período cuenta si el grado ya tiene actividades en él,
+// o si el alumno tiene recuperación registrada en ese período.
+function calcularFinalAlumno(grado, al) {
+    const periodos = [1, 2, 3, 4].map(p => {
+        const tP    = grado.tareas.filter(t => Number(t.periodo) === p);
+        const recup = (al.recuperacion || {})[p];
+        if (tP.length === 0 && !recup) return null;
+        const d = obtenerCalculos(al, tP, p);
+        return { nota: parseFloat(d.r.notaFinal), recup: d.esRecuperacion, pC: d.pC, pI: d.pI, nE: d.nE };
+    });
+    const validos  = periodos.filter(Boolean);
+    const suma     = redondear1(validos.reduce((s, x) => s + x.nota, 0));
+    const promedio = validos.length ? redondear1(suma / validos.length) : 0;
+    return { periodos, suma, promedio, contados: validos.length, aprobado: promedio >= NOTA_APROBACION };
+}
+
+function periodosConActividades(grado) {
+    return [1, 2, 3, 4].filter(p => grado.tareas.some(t => Number(t.periodo) === p));
+}
+
+// Desde la pantalla de selección de período
+window.abrirResultadoFinal = async (id) => {
+    gIdx = gradosCache.findIndex(g => g.id === id);
+    if (gIdx === -1) return;
+    const [resAlumnos, resTareas] = await Promise.all([
+        supabase.from('alumnos').select('*').eq('grado_id', id),
+        supabase.from('tareas').select('*').eq('grado_id', id)
+    ]);
+    if (resAlumnos.error || resTareas.error) { alert('Error cargando datos del grado'); return; }
+    gradosCache[gIdx].alumnos = resAlumnos.data || [];
+    gradosCache[gIdx].tareas  = resTareas.data  || [];
+    document.getElementById('titulo-grado-actual').innerText = gradosCache[gIdx].nombre;
+    finalVolverA = 'vista-selector-periodo';
+    renderResultadoFinal();
+};
+
+// Desde la pantalla de notas (botón FINAL)
+window.verResultadoFinal = () => {
+    if (!gradosCache[gIdx]) return;
+    finalVolverA = 'vista-detalle-grado';
+    renderResultadoFinal();
+};
+
+window.cerrarResultadoFinal = () => {
+    if (finalVolverA === 'vista-detalle-grado') {
+        mostrarVista('vista-detalle-grado');
+        renderDetalle();
+    } else {
+        abrirSelectorPeriodo(gradosCache[gIdx].id);
+    }
+};
+
+function renderResultadoFinal() {
+    const grado = gradosCache[gIdx];
+    const alumnos = ordenarAlumnos([...grado.alumnos]);
+    const conAct  = periodosConActividades(grado);
+    const parcial = conAct.length < 4;
+
+    const filas = alumnos.map((al, idx) => {
+        const f = calcularFinalAlumno(grado, al);
+        const celdas = f.periodos.map(p => {
+            if (!p) return `<td class="border border-slate-300 text-center p-2 text-slate-300">—</td>`;
+            const color = p.nota >= NOTA_APROBACION ? 'text-slate-700' : 'text-red-600 font-black';
+            const badge = p.recup ? '<sup class="text-amber-600 font-black"> R</sup>' : '';
+            return `<td class="border border-slate-300 text-center p-2 font-bold ${color}">${p.nota.toFixed(1)}${badge}</td>`;
+        }).join('');
+        return `
+        <tr class="${f.aprobado ? '' : 'bg-red-50'}">
+            <td class="border border-slate-300 text-center p-2 text-slate-400 font-bold">${idx + 1}</td>
+            <td class="border border-slate-300 p-2 font-bold uppercase text-slate-800">${al.nombre}</td>
+            ${celdas}
+            <td class="border border-slate-300 text-center p-2 font-black bg-blue-50 text-blue-900">${f.suma.toFixed(1)}</td>
+            <td class="border border-slate-300 text-center p-2 font-black text-base bg-slate-100 ${f.aprobado ? 'text-emerald-700' : 'text-red-600'}">${f.promedio.toFixed(1)}</td>
+            <td class="border border-slate-300 text-center p-2 text-[10px] font-black uppercase ${f.aprobado ? 'text-emerald-700' : 'text-red-600'}">${f.contados ? (f.aprobado ? 'Aprobado' : 'Reprobado') : '—'}</td>
+        </tr>`;
+    }).join('');
+
+    const resultados = alumnos.map(al => calcularFinalAlumno(grado, al));
+    const aprobados  = resultados.filter(r => r.contados && r.aprobado).length;
+    const reprobados = resultados.filter(r => r.contados && !r.aprobado).length;
+
+    document.getElementById('final-contenido').innerHTML = `
+        <div class="text-center mb-6">
+            <p class="text-[10px] text-slate-400 uppercase font-bold">Instituto Diocesano San Juan Evangelista</p>
+            <h1 class="text-xl font-black uppercase border-b-2 border-black pb-2 mt-1">Resultado Final ${new Date().getFullYear()}</h1>
+            <h2 class="text-lg font-bold mt-2 uppercase text-blue-900">${grado.nombre}${grado.materia ? ' — ' + grado.materia : ''}</h2>
+            <p class="text-[10px] text-slate-500 mt-1">Generado: ${new Date().toLocaleDateString('es-SV', { dateStyle: 'long' })}</p>
+            ${parcial ? `<p class="no-print mt-3 inline-block text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-300 rounded-full px-3 py-1">
+                <i class="fas fa-info-circle mr-1"></i>Promedio parcial: hay actividades en ${conAct.length} de 4 períodos</p>` : ''}
+        </div>
+        <div class="overflow-x-auto">
+        <table class="w-full text-[11px] border-collapse border border-slate-400 min-w-[640px]">
+            <thead>
+                <tr class="bg-slate-800 text-white text-[10px] uppercase">
+                    <th class="border border-slate-400 p-2 w-10">Nº</th>
+                    <th class="border border-slate-400 p-2 text-left">Apellidos y nombres</th>
+                    <th class="border border-slate-400 p-2">P1</th>
+                    <th class="border border-slate-400 p-2">P2</th>
+                    <th class="border border-slate-400 p-2">P3</th>
+                    <th class="border border-slate-400 p-2">P4</th>
+                    <th class="border border-slate-400 p-2 bg-blue-700">Suma</th>
+                    <th class="border border-slate-400 p-2 bg-blue-900">Promedio</th>
+                    <th class="border border-slate-400 p-2">Estado</th>
+                </tr>
+            </thead>
+            <tbody>${filas || `<tr><td colspan="9" class="p-6 text-center text-slate-400 italic">No hay alumnos en este grado.</td></tr>`}</tbody>
+        </table>
+        </div>
+        <div class="mt-4 flex flex-wrap gap-6 text-[11px] font-bold">
+            <span>Total alumnos: <b>${alumnos.length}</b></span>
+            <span class="text-emerald-700">Aprobados: <b>${aprobados}</b></span>
+            <span class="text-red-600">Reprobados: <b>${reprobados}</b></span>
+            <span class="text-slate-400 font-medium">Aprobación: ${NOTA_APROBACION.toFixed(1)} · <sup class="text-amber-600 font-black">R</sup> = período con recuperación</span>
+        </div>
+        <div class="mt-8 grid grid-cols-3 gap-8 text-center text-[10px] pt-8">
+            <div class="border-t border-black pt-2"><p class="font-bold uppercase">Docente</p></div>
+            <div class="border-t border-black pt-2"><p class="font-bold uppercase">Coordinador/a</p></div>
+            <div class="border-t border-black pt-2"><p class="font-bold uppercase">Director/a</p></div>
+        </div>
+    `;
+    mostrarVista('vista-final');
+}
+
+window.exportarFinalExcel = () => {
+    const grado = gradosCache[gIdx];
+    if (!grado) return;
+    if (typeof XLSX === 'undefined') { alert('No se pudo cargar la librería de Excel. Revisá tu conexión.'); return; }
+
+    const alumnos = ordenarAlumnos([...grado.alumnos]);
+    const anio    = new Date().getFullYear();
+    const titulo  = `${grado.nombre}${grado.materia ? ' — ' + grado.materia : ''}`;
+    const conAct  = periodosConActividades(grado);
+
+    // Hoja 1: Resultado final
+    const hoja1 = [
+        ['INSTITUTO DIOCESANO SAN JUAN EVANGELISTA'],
+        [`RESULTADO FINAL ${anio}`],
+        [titulo],
+        [conAct.length < 4 ? `Promedio parcial: actividades en ${conAct.length} de 4 períodos` : 'Año completo (4 períodos)'],
+        [],
+        ['Nº', 'APELLIDOS Y NOMBRES', 'P1', 'P2', 'P3', 'P4', 'SUMA', 'PROMEDIO', 'ESTADO']
+    ];
+    let aprobados = 0, reprobados = 0;
+    alumnos.forEach((al, i) => {
+        const f = calcularFinalAlumno(grado, al);
+        if (f.contados) f.aprobado ? aprobados++ : reprobados++;
+        hoja1.push([
+            i + 1,
+            al.nombre,
+            ...f.periodos.map(p => p ? p.nota : ''),
+            f.suma,
+            f.promedio,
+            f.contados ? (f.aprobado ? 'APROBADO' : 'REPROBADO') : ''
+        ]);
+    });
+    hoja1.push([]);
+    hoja1.push(['', 'Total alumnos', alumnos.length]);
+    hoja1.push(['', 'Aprobados', aprobados]);
+    hoja1.push(['', 'Reprobados', reprobados]);
+    hoja1.push(['', `Nota de aprobación: ${NOTA_APROBACION.toFixed(1)}`]);
+
+    const ws1 = XLSX.utils.aoa_to_sheet(hoja1);
+    ws1['!cols'] = [{ wch: 5 }, { wch: 40 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 7 }, { wch: 9 }, { wch: 10 }, { wch: 12 }];
+    ws1['!merges'] = [0, 1, 2, 3].map(r => ({ s: { r, c: 0 }, e: { r, c: 8 } }));
+    // Formato de un decimal en notas, suma y promedio
+    for (let r = 6; r < 6 + alumnos.length; r++) {
+        for (let c = 2; c <= 7; c++) {
+            const cell = ws1[XLSX.utils.encode_cell({ r, c })];
+            if (cell && cell.t === 'n') cell.z = '0.0';
+        }
+    }
+
+    // Hoja 2: Detalle por período (Cotidiana, Integradora, Examen, Nota)
+    const enc1 = ['Nº', 'APELLIDOS Y NOMBRES'];
+    const enc2 = ['', ''];
+    [1, 2, 3, 4].forEach(p => { enc1.push(`PERÍODO ${p}`, '', '', ''); enc2.push('Cot.', 'Int.', 'Exa.', 'Nota'); });
+    const hoja2 = [[`DETALLE POR PERÍODO — ${titulo}`], [], enc1, enc2];
+    alumnos.forEach((al, i) => {
+        const f = calcularFinalAlumno(grado, al);
+        const fila = [i + 1, al.nombre];
+        f.periodos.forEach(p => {
+            if (!p) fila.push('', '', '', '');
+            else fila.push(redondear1(p.pC), redondear1(p.pI), redondear1(p.nE), p.recup ? `${p.nota.toFixed(1)} R` : p.nota);
+        });
+        hoja2.push(fila);
+    });
+    const ws2 = XLSX.utils.aoa_to_sheet(hoja2);
+    ws2['!cols'] = [{ wch: 5 }, { wch: 40 }, ...Array(16).fill({ wch: 6 })];
+    ws2['!merges'] = [
+        { s: { r: 0, c: 0 }, e: { r: 0, c: 17 } },
+        ...[0, 1, 2, 3].map(k => ({ s: { r: 2, c: 2 + k * 4 }, e: { r: 2, c: 5 + k * 4 } }))
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws1, 'Resultado final');
+    XLSX.utils.book_append_sheet(wb, ws2, 'Detalle por período');
+
+    const nombreArchivo = `Resultado final ${grado.nombre} ${anio}`.replace(/[\\/:*?"<>|]/g, '-') + '.xlsx';
+    XLSX.writeFile(wb, nombreArchivo);
 };
 
 // ─────────────────────────────────────────────
