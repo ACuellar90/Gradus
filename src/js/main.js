@@ -369,9 +369,15 @@ window.setPeriodo = (n) => {
     renderDetalle();
 };
 
+// Detalles abiertos: se mantienen abiertos aunque se guarde una nota
+const detallesAbiertos = new Set();
+
 window.toggleDetalle = (alId) => {
     const el = document.getElementById(`detalle-${alId}`);
-    if (el) el.classList.toggle('hidden');
+    if (!el) return;
+    el.classList.toggle('hidden');
+    if (el.classList.contains('hidden')) detallesAbiertos.delete(alId);
+    else detallesAbiertos.add(alId);
 };
 
 // ─────────────────────────────────────────────
@@ -419,6 +425,9 @@ function renderDetalle() {
     const grado = gradosCache[gIdx];
     if (!grado) return;
 
+    // Recordar en qué casilla estaba el cursor para devolverlo después de redibujar
+    const focoId = document.activeElement && document.activeElement.id;
+
     ordenarAlumnos(grado.alumnos);
     const tP   = grado.tareas.filter(t => t.periodo === pAct);
     const tCot = tP.filter(t => t.tipo === 'c');
@@ -457,7 +466,7 @@ function renderDetalle() {
                 </button>
             </td>
         </tr>
-        <tr id="detalle-${al.id}" class="hidden bg-slate-50">
+        <tr id="detalle-${al.id}" class="${detallesAbiertos.has(al.id) ? '' : 'hidden'} bg-slate-50">
             <td colspan="8" class="p-6">
 
                 <!-- BOTÓN DE RECUPERACIÓN -->
@@ -495,6 +504,7 @@ function renderDetalle() {
                         <div class="flex items-center gap-1">
                             <label class="text-[9px] font-bold uppercase text-amber-600">${label}</label>
                             <input type="number" step="0.1" min="0" max="2" placeholder="0.0"
+                                id="extra-${al.id}-${key}"
                                 value="${bono[key] || ''}"
                                 onchange="guardarPuntoExtra('${al.id}', '${key}', this.value)"
                                 class="w-14 text-center border border-amber-300 rounded-lg text-[10px] font-bold bg-white p-1">
@@ -518,15 +528,16 @@ function renderDetalle() {
                                     <div class="flex justify-between items-center text-[11px] mb-2 gap-2">
                                         <span class="flex-1 truncate text-slate-600">${t.nombre}</span>
                                         <input type="number" step="0.1" min="0" max="10"
+                                            id="nota-${al.id}-${t.id}"
                                             value="${notas[t.id] !== undefined ? notas[t.id] : ''}"
                                             placeholder="0"
                                             onchange="guardarNota('${al.id}', '${t.id}', this.value)"
                                             class="w-12 text-center font-bold border border-slate-200 rounded-lg bg-slate-50 p-1 text-xs">
-                                        <button onclick="editarTarea('${t.id}')"
+                                        <button onclick="editarTarea('${t.id}')" tabindex="-1"
                                             class="text-blue-300 hover:text-blue-500 text-[9px]" title="Editar tarea">
                                             <i class="fas fa-pen"></i>
                                         </button>
-                                        <button onclick="eliminarTarea('${t.id}')"
+                                        <button onclick="eliminarTarea('${t.id}')" tabindex="-1"
                                             class="text-red-300 hover:text-red-500 text-[9px]" title="Eliminar tarea">
                                             <i class="fas fa-times"></i>
                                         </button>
@@ -577,6 +588,11 @@ function renderDetalle() {
             </td>
         </tr>`;
     }).join('');
+
+    if (focoId) {
+        const el = document.getElementById(focoId);
+        if (el) { el.focus({ preventScroll: true }); if (el.select) el.select(); }
+    }
 }
 
 // ─────────────────────────────────────────────
